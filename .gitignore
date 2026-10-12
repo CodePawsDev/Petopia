@@ -24,3 +24,12 @@ test-results/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Generated Prisma Client
+/apps/api/src/generated/prisma/
+
+# Local AI tooling
+/apps/api/.agents/
+/apps/api/.claude/
+/apps/api/.windsurf/
+/apps/api/skills-lock.json
