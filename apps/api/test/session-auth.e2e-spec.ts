@@ -192,4 +192,52 @@ describe('Session authentication (e2e)', () => {
       ).toBe(0);
     },
   );
+  it('should reject an existing session when the account is deactivated', async () => {
+    const agent = request.agent(app.getHttpServer());
+
+    await agent.post('/auth/login').send({ email, password }).expect(200);
+
+    await agent.get('/auth/me').expect(200);
+
+    try {
+      await prisma.user.update({
+        where: { email },
+        data: { active: false },
+      });
+
+      await agent.get('/auth/me').expect(401);
+    } finally {
+      await prisma.user.update({
+        where: { email },
+        data: { active: true },
+      });
+
+      await agent.post('/auth/logout').expect(204);
+    }
+  });
+
+  it('should reject an old session after auth version changes and allow a new login', async () => {
+    const agent = request.agent(app.getHttpServer());
+
+    await agent.post('/auth/login').send({ email, password }).expect(200);
+
+    await agent.get('/auth/me').expect(200);
+
+    try {
+      await prisma.user.update({
+        where: { email },
+        data: {
+          authVersion: { increment: 1 },
+        },
+      });
+
+      await agent.get('/auth/me').expect(401);
+
+      await agent.post('/auth/login').send({ email, password }).expect(200);
+
+      await agent.get('/auth/me').expect(200);
+    } finally {
+      await agent.post('/auth/logout').expect(204);
+    }
+  });
 });
