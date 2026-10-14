@@ -1,8 +1,13 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
@@ -40,5 +45,73 @@ export class AuthService {
 
       throw error;
     }
+  }
+
+  async validateCredentials(dto: LoginDto) {
+    const user = await this.prismaService.user.findUnique({
+      where: {
+        email: dto.email,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        passwordHash: true,
+        active: true,
+        authVersion: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const passwordMatches = await argon2.verify(
+      user.passwordHash,
+      dto.password,
+    );
+
+    if (!passwordMatches || !user.active) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      authVersion: user.authVersion,
+    };
+  }
+
+  async getSessionUser(
+    userId: string | undefined,
+    authVersion: number | undefined,
+  ) {
+    if (!userId || authVersion === undefined) {
+      throw new UnauthorizedException('Authentication required');
+    }
+
+    const user = await this.prismaService.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        active: true,
+        authVersion: true,
+      },
+    });
+
+    if (!user || !user.active || user.authVersion !== authVersion) {
+      throw new UnauthorizedException('Authentication required');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+    };
   }
 }
