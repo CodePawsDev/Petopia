@@ -8,11 +8,14 @@ import {
   Post,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { SessionAuthGuard } from './guards/session-auth.guard';
+import type { AuthenticatedRequest } from './types/authenticated-request';
 
 @Controller('auth')
 export class AuthController {
@@ -69,12 +72,10 @@ export class AuthController {
   }
 
   @Get('me')
+  @UseGuards(SessionAuthGuard)
   @Header('Cache-Control', 'no-store')
-  me(@Req() req: Request) {
-    return this.authService.getSessionUser(
-      req.session.userId,
-      req.session.authVersion,
-    );
+  me(@Req() req: AuthenticatedRequest) {
+    return req.currentUser;
   }
 
   @Post('logout')
