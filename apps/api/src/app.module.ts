@@ -2,8 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { SessionModule } from './session/session.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { AuthModule } from './auth/auth.module';
       envFilePath: '.env',
       validate: (config: Record<string, unknown>) => {
         const databaseUrl = config['DATABASE_URL'];
+        const sessionSecret = config['SESSION_SECRET'];
 
         if (
           typeof databaseUrl !== 'string' ||
@@ -20,11 +22,21 @@ import { AuthModule } from './auth/auth.module';
           throw new Error('DATABASE_URL is required');
         }
 
+        if (
+          typeof sessionSecret !== 'string' ||
+          !/^[0-9a-fA-F]{64}$/.test(sessionSecret)
+        ) {
+          throw new Error(
+            'SESSION_SECRET must be a 64-character hexadecimal string',
+          );
+        }
+
         return config;
       },
     }),
     PrismaModule,
     AuthModule,
+    SessionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

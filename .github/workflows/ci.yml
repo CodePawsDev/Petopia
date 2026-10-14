@@ -75,6 +75,8 @@ jobs:
         run: npm run test:e2e
         env:
           DATABASE_URL: 'postgresql://petopia_app:password@localhost:5432/petopia_test?schema=public'
+          # Test-only secret; never use in production.
+          SESSION_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 
       - name: Build web and API
         run: npm run build
