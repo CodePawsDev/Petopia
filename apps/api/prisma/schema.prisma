@@ -29,3 +29,35 @@ model Session {
   @@index([expire], map: "IDX_session_expire")
   @@map("session")
 }
+
+model BusinessUnit {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(50)
+  name      String   @db.VarChar(100)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  branches Branch[]
+
+  @@map("business_units")
+}
+
+model Branch {
+  id              String   @id @default(uuid()) @db.Uuid
+  businessUnitId  String   @map("business_unit_id") @db.Uuid
+  code            String   @unique @db.VarChar(50)
+  name            String   @db.VarChar(100)
+  timezone        String   @default("Asia/Bangkok") @db.VarChar(100)
+  active          Boolean  @default(true)
+  scheduleVersion Int      @default(1) @map("schedule_version")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
+
+  @@index([businessUnitId])
+  @@map("branches")
+}
+
+
