@@ -65,11 +65,11 @@ describe('Session authentication (e2e)', () => {
     }
   });
 
-  it('should reject requests without an authenticated session', async () => {
+  it('[TC-AUTH-010] should reject requests without an authenticated session', async () => {
     await request(app.getHttpServer()).get('/auth/me').expect(401);
   });
 
-  it('should log in, return the current user and invalidate the session on logout', async () => {
+  it('[TC-AUTH-007, TC-AUTH-011, TC-AUTH-012] should log in, return the current user and invalidate the session on logout', async () => {
     const agent = request.agent(app.getHttpServer());
 
     const loginResponse = await agent
@@ -144,17 +144,19 @@ describe('Session authentication (e2e)', () => {
 
   it.each([
     {
+      caseId: 'TC-AUTH-008',
       name: 'an incorrect password',
       useExistingEmail: true,
       loginPassword: 'WrongPassword2026!',
     },
     {
+      caseId: 'TC-AUTH-009',
       name: 'an unknown email',
       useExistingEmail: false,
       loginPassword: 'PetopiaTest2026!',
     },
   ])(
-    'should reject $name without authenticating',
+    '[$caseId] should reject $name without authenticating',
     async ({ useExistingEmail, loginPassword }) => {
       const agent = request.agent(app.getHttpServer());
 
@@ -192,7 +194,7 @@ describe('Session authentication (e2e)', () => {
       ).toBe(0);
     },
   );
-  it('should reject an existing session when the account is deactivated', async () => {
+  it('[TC-AUTH-013] should reject an existing session when the account is deactivated', async () => {
     const agent = request.agent(app.getHttpServer());
 
     await agent.post('/auth/login').send({ email, password }).expect(200);
@@ -216,7 +218,7 @@ describe('Session authentication (e2e)', () => {
     }
   });
 
-  it('should reject an old session after auth version changes and allow a new login', async () => {
+  it('[TC-AUTH-014] should reject an old session after auth version changes and allow a new login', async () => {
     const agent = request.agent(app.getHttpServer());
 
     await agent.post('/auth/login').send({ email, password }).expect(200);

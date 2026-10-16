@@ -52,7 +52,7 @@ describe('Customer registration (e2e)', () => {
     }
   });
 
-  it('should normalize input, store a password hash and return only public fields', async () => {
+  it('[TC-AUTH-001] should normalize input, store a password hash and return only public fields', async () => {
     const payload = createPayload();
 
     const response = await request(app.getHttpServer())
@@ -87,7 +87,7 @@ describe('Customer registration (e2e)', () => {
     );
   });
 
-  it('should reject the same email regardless of letter case', async () => {
+  it('[TC-AUTH-002] should reject the same email regardless of letter case', async () => {
     const payload = createPayload();
 
     await request(app.getHttpServer())
@@ -116,35 +116,41 @@ describe('Customer registration (e2e)', () => {
 
   it.each([
     {
+      caseId: 'TC-AUTH-004',
       name: 'invalid email',
       overrides: { email: 'not-an-email' },
     },
     {
+      caseId: 'TC-AUTH-005',
       name: 'password shorter than 8 characters',
       overrides: { password: 'short' },
     },
     {
+      caseId: 'TC-AUTH-006',
       name: 'a client-supplied staff role',
       overrides: { role: 'BRANCH_MANAGER' },
     },
-  ])('should reject $name without creating a user', async ({ overrides }) => {
-    const payload = createPayload();
-    const input = { ...payload, ...overrides };
-    testEmails.add(input.email);
+  ])(
+    '[$caseId] should reject $name without creating a user',
+    async ({ overrides }) => {
+      const payload = createPayload();
+      const input = { ...payload, ...overrides };
+      testEmails.add(input.email);
 
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send(input)
-      .expect(400);
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send(input)
+        .expect(400);
 
-    expect(
-      await prisma.user.count({
-        where: { email: input.email },
-      }),
-    ).toBe(0);
-  });
+      expect(
+        await prisma.user.count({
+          where: { email: input.email },
+        }),
+      ).toBe(0);
+    },
+  );
 
-  it('should create only one user when the same email registers concurrently', async () => {
+  it('[TC-AUTH-003] should create only one user when the same email registers concurrently', async () => {
     const payload = createPayload();
 
     const responses = await Promise.all([
