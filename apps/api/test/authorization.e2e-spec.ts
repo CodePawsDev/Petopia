@@ -266,6 +266,122 @@ describe('Branch authorization (database integration)', () => {
     }
   });
 
+  it('[TC-AUTHZ-030] isolates account data and branch access between two authenticated users', async () => {
+    const managerAgent = request.agent(app.getHttpServer());
+    const customerAgent = request.agent(app.getHttpServer());
+
+    const customerEmail = `e2e-isolation-${randomUUID()}@example.com`;
+    const password = 'PetopiaTest2026!';
+
+    try {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: customerEmail,
+          password,
+          displayName: 'Isolation Customer',
+        })
+        .expect(201);
+
+      const customer = await prisma.user.findUniqueOrThrow({
+        where: { email: customerEmail },
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+        },
+      });
+
+      await managerAgent
+        .post('/auth/login')
+        .send({
+          email: `e2e-authorization-${runId}@example.com`,
+          password,
+        })
+        .expect(200);
+
+      await customerAgent
+        .post('/auth/login')
+        .send({ email: customerEmail, password })
+        .expect(200);
+
+      await managerAgent
+        .get('/auth/me')
+        .expect(200)
+        .expect({
+          id: userId,
+          email: `e2e-authorization-${runId}@example.com`,
+          displayName: 'Authorization Test',
+          staffAssignments: [
+            {
+              role: StaffRole.BRANCH_MANAGER,
+              branch: {
+                id: branchAId,
+                code: `QA-A-${runId}`,
+                name: 'Test Branch A',
+              },
+            },
+          ],
+          permissionGrants: [],
+        });
+
+      await customerAgent
+        .get('/auth/me')
+        .expect(200)
+        .expect({
+          ...customer,
+          staffAssignments: [],
+          permissionGrants: [],
+        });
+
+      for (const workspace of ['manager', 'groomer', 'payment']) {
+        await customerAgent
+          .get(`/branches/${branchAId}/workspaces/${workspace}`)
+          .expect(403);
+      }
+
+      await customerAgent.post('/auth/logout').expect(204);
+      await customerAgent.get('/auth/me').expect(401);
+
+      // Logging out the customer must not invalidate the manager's session.
+      await managerAgent
+        .get(`/branches/${branchAId}/workspaces/manager`)
+        .expect(200)
+        .expect({
+          workspace: 'manager',
+          branch: {
+            id: branchAId,
+            code: `QA-A-${runId}`,
+            name: 'Test Branch A',
+          },
+        });
+    } finally {
+      try {
+        await managerAgent.post('/auth/logout').expect(204);
+      } finally {
+        const customer = await prisma.user.findUnique({
+          where: { email: customerEmail },
+          select: { id: true },
+        });
+
+        if (customer) {
+          await prisma.session.deleteMany({
+            where: {
+              sess: {
+                path: ['userId'],
+                equals: customer.id,
+              },
+            },
+          });
+
+          await prisma.user.delete({
+            where: { id: customer.id },
+          });
+        }
+      }
+    }
+  });
+
   describe('current-user access', () => {
     const expectedAssignment = {
       role: StaffRole.BRANCH_MANAGER,

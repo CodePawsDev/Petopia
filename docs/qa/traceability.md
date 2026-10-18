@@ -72,9 +72,12 @@ Authorization checks are implemented in:
 - [Authorization tests](../../apps/api/test/authorization.e2e-spec.ts)
 - [Test-only controller](../../apps/api/test/helpers/authorization-test.controller.ts)
 
-The suite includes database integration tests and HTTP tests against
-test-only routes. Production business endpoints must apply these guards
-and enforce resource ownership when implemented.
+The suite includes database integration tests, HTTP tests against test-only
+routes and HTTP tests against branch workspace endpoints.
+
+Account isolation and branch access are covered. Ownership checks for pets,
+bookings and other business resources will be added when those endpoints
+are implemented.
 
 | Requirement ID | Acceptance criterion                                                                                                                             | Test case IDs                                          | Coverage    |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ | ----------- |
@@ -90,40 +93,42 @@ and enforce resource ownership when implemented.
 | REQ-AUTHZ-010  | Managers can access manager and payment workspaces in their assigned branch, without implicit groomer access                                     | TC-AUTHZ-027                                           | Implemented |
 | REQ-AUTHZ-011  | Groomer workspace access requires an active groomer assignment in that branch; revocation takes effect within an existing session                | TC-AUTHZ-028                                           | Implemented |
 | REQ-AUTHZ-012  | An explicit payment grant permits payment workspace access without manager or groomer access; revocation takes effect within an existing session | TC-AUTHZ-029                                           | Implemented |
+| REQ-AUTHZ-013  | Authenticated users see only their own account and branch access; logging out one user does not invalidate another user's session                | TC-AUTHZ-030                                           | Implemented |
 
 ### Authorization Test Case Index
 
-| Test case ID | Scenario                                                                           |
-| ------------ | ---------------------------------------------------------------------------------- |
-| TC-AUTHZ-001 | Allow an active manager in their assigned branch                                   |
-| TC-AUTHZ-002 | Reject role access to another branch                                               |
-| TC-AUTHZ-003 | Reject a role the user does not hold                                               |
-| TC-AUTHZ-004 | Reject access without a matching assignment                                        |
-| TC-AUTHZ-005 | Reject an inactive assignment                                                      |
-| TC-AUTHZ-006 | Reject role access for an inactive user                                            |
-| TC-AUTHZ-007 | Reject role access to an inactive branch                                           |
-| TC-AUTHZ-008 | Reject role access under an inactive business unit                                 |
-| TC-AUTHZ-009 | Return 401 for a manager route without a session                                   |
-| TC-AUTHZ-010 | Allow the assigned branch and reject another branch over HTTP                      |
-| TC-AUTHZ-011 | Allow a branch manager to receive payment without an explicit grant                |
-| TC-AUTHZ-012 | Reject payment access in another branch without a grant                            |
-| TC-AUTHZ-013 | Allow an active payment grant without granting the manager role                    |
-| TC-AUTHZ-014 | Reject an inactive payment grant                                                   |
-| TC-AUTHZ-015 | Reject payment-grant access for an inactive user                                   |
-| TC-AUTHZ-016 | Reject payment-grant access to an inactive branch                                  |
-| TC-AUTHZ-017 | Reject payment-grant access under an inactive business unit                        |
-| TC-AUTHZ-018 | Verify payment access, manager denial and grant revocation over HTTP               |
-| TC-AUTHZ-019 | Return public account fields and active branch roles and permission grants         |
-| TC-AUTHZ-020 | Exclude an inactive staff assignment from current-user access                      |
-| TC-AUTHZ-021 | Exclude an inactive permission grant from current-user access                      |
-| TC-AUTHZ-022 | Exclude roles and grants belonging to inactive branches                            |
-| TC-AUTHZ-023 | Exclude roles and grants belonging to an inactive business unit                    |
-| TC-AUTHZ-024 | Reject manager workspace access without a session                                  |
-| TC-AUTHZ-025 | Reject groomer workspace access without a session                                  |
-| TC-AUTHZ-026 | Reject payment workspace access without a session                                  |
-| TC-AUTHZ-027 | Verify manager and payment access, branch isolation and no implicit groomer access |
-| TC-AUTHZ-028 | Verify groomer access, branch isolation, role separation and assignment revocation |
-| TC-AUTHZ-029 | Verify explicit payment access, role separation and grant revocation               |
+| Test case ID | Scenario                                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------------- |
+| TC-AUTHZ-001 | Allow an active manager in their assigned branch                                                                  |
+| TC-AUTHZ-002 | Reject role access to another branch                                                                              |
+| TC-AUTHZ-003 | Reject a role the user does not hold                                                                              |
+| TC-AUTHZ-004 | Reject access without a matching assignment                                                                       |
+| TC-AUTHZ-005 | Reject an inactive assignment                                                                                     |
+| TC-AUTHZ-006 | Reject role access for an inactive user                                                                           |
+| TC-AUTHZ-007 | Reject role access to an inactive branch                                                                          |
+| TC-AUTHZ-008 | Reject role access under an inactive business unit                                                                |
+| TC-AUTHZ-009 | Return 401 for a manager route without a session                                                                  |
+| TC-AUTHZ-010 | Allow the assigned branch and reject another branch over HTTP                                                     |
+| TC-AUTHZ-011 | Allow a branch manager to receive payment without an explicit grant                                               |
+| TC-AUTHZ-012 | Reject payment access in another branch without a grant                                                           |
+| TC-AUTHZ-013 | Allow an active payment grant without granting the manager role                                                   |
+| TC-AUTHZ-014 | Reject an inactive payment grant                                                                                  |
+| TC-AUTHZ-015 | Reject payment-grant access for an inactive user                                                                  |
+| TC-AUTHZ-016 | Reject payment-grant access to an inactive branch                                                                 |
+| TC-AUTHZ-017 | Reject payment-grant access under an inactive business unit                                                       |
+| TC-AUTHZ-018 | Verify payment access, manager denial and grant revocation over HTTP                                              |
+| TC-AUTHZ-019 | Return public account fields and active branch roles and permission grants                                        |
+| TC-AUTHZ-020 | Exclude an inactive staff assignment from current-user access                                                     |
+| TC-AUTHZ-021 | Exclude an inactive permission grant from current-user access                                                     |
+| TC-AUTHZ-022 | Exclude roles and grants belonging to inactive branches                                                           |
+| TC-AUTHZ-023 | Exclude roles and grants belonging to an inactive business unit                                                   |
+| TC-AUTHZ-024 | Reject manager workspace access without a session                                                                 |
+| TC-AUTHZ-025 | Reject groomer workspace access without a session                                                                 |
+| TC-AUTHZ-026 | Reject payment workspace access without a session                                                                 |
+| TC-AUTHZ-027 | Verify manager and payment access, branch isolation and no implicit groomer access                                |
+| TC-AUTHZ-028 | Verify groomer access, branch isolation, role separation and assignment revocation                                |
+| TC-AUTHZ-029 | Verify explicit payment access, role separation and grant revocation                                              |
+| TC-AUTHZ-030 | Isolate account data and branch access between two users; logging out one user preserves the other user's session |
 
 ## Maintenance
 
