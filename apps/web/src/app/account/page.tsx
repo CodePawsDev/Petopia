@@ -3,22 +3,120 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+type Branch = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type StaffRole = 'GROOMER' | 'BRANCH_MANAGER';
+
+type StaffAssignment = {
+  role: StaffRole;
+  branch: Branch;
+};
+
+type PermissionGrant = {
+  permission: 'RECEIVE_PAYMENT';
+  branch: Branch;
+};
+
 type Account = {
   id: string;
   email: string;
   displayName: string;
+  staffAssignments: StaffAssignment[];
+  permissionGrants: PermissionGrant[];
 };
 
-function isAccount(value: unknown): value is Account {
-  if (typeof value !== 'object' || value === null) return false;
+type BranchAccess = {
+  branch: Branch;
+  roles: StaffRole[];
+  canReceivePayment: boolean;
+};
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isBranch(value: unknown): value is Branch {
   return (
-    'id' in value &&
+    isRecord(value) &&
     typeof value.id === 'string' &&
-    'email' in value &&
+    typeof value.code === 'string' &&
+    typeof value.name === 'string'
+  );
+}
+
+function isStaffAssignment(value: unknown): value is StaffAssignment {
+  return (
+    isRecord(value) &&
+    (value.role === 'GROOMER' || value.role === 'BRANCH_MANAGER') &&
+    isBranch(value.branch)
+  );
+}
+
+function isPermissionGrant(value: unknown): value is PermissionGrant {
+  return (
+    isRecord(value) &&
+    value.permission === 'RECEIVE_PAYMENT' &&
+    isBranch(value.branch)
+  );
+}
+
+function isAccount(value: unknown): value is Account {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
     typeof value.email === 'string' &&
-    'displayName' in value &&
-    typeof value.displayName === 'string'
+    typeof value.displayName === 'string' &&
+    Array.isArray(value.staffAssignments) &&
+    value.staffAssignments.every(isStaffAssignment) &&
+    Array.isArray(value.permissionGrants) &&
+    value.permissionGrants.every(isPermissionGrant)
+  );
+}
+
+const roleLabels: Record<StaffRole, string> = {
+  GROOMER: 'ช่างอาบน้ำตัดขน',
+  BRANCH_MANAGER: 'ผู้จัดการสาขา',
+};
+
+function getBranchAccess(account: Account): BranchAccess[] {
+  const branches = new Map<string, BranchAccess>();
+
+  function getOrCreate(branch: Branch): BranchAccess {
+    const existing = branches.get(branch.id);
+    if (existing) return existing;
+
+    const access: BranchAccess = {
+      branch,
+      roles: [],
+      canReceivePayment: false,
+    };
+
+    branches.set(branch.id, access);
+    return access;
+  }
+
+  for (const assignment of account.staffAssignments) {
+    const access = getOrCreate(assignment.branch);
+
+    if (!access.roles.includes(assignment.role)) {
+      access.roles.push(assignment.role);
+    }
+
+    if (assignment.role === 'BRANCH_MANAGER') {
+      access.canReceivePayment = true;
+    }
+  }
+
+  for (const grant of account.permissionGrants) {
+    getOrCreate(grant.branch).canReceivePayment = true;
+  }
+
+  return [...branches.values()].sort((a, b) =>
+    a.branch.code.localeCompare(b.branch.code),
   );
 }
 
@@ -107,6 +205,7 @@ export default function AccountPage() {
     }
   }
 
+  const branchAccess = account ? getBranchAccess(account) : [];
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 text-slate-900">
       <section
@@ -143,6 +242,56 @@ export default function AccountPage() {
                 <dd className="mt-1 break-all">{account.email}</dd>
               </div>
             </dl>
+            <section
+              aria-labelledby="branch-access-heading"
+              className="mt-8 border-t border-slate-200 pt-6"
+            >
+              <h2 id="branch-access-heading" className="text-lg font-semibold">
+                สิทธิ์การทำงานตามสาขา
+              </h2>
+
+              {branchAccess.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-600">
+                  บัญชีนี้ใช้งานในฐานะลูกค้า และไม่มีสิทธิ์พนักงาน
+                </p>
+              ) : (
+                <ul className="mt-4 space-y-4">
+                  {branchAccess.map((access) => (
+                    <li
+                      key={access.branch.id}
+                      className="rounded-xl border border-slate-200 p-4"
+                    >
+                      <h3 className="font-semibold">{access.branch.name}</h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {access.branch.code}
+                      </p>
+
+                      <dl className="mt-3 space-y-3 text-sm">
+                        <div>
+                          <dt className="text-slate-600">บทบาท</dt>
+                          <dd className="mt-1">
+                            {access.roles.length > 0
+                              ? access.roles
+                                  .map((role) => roleLabels[role])
+                                  .join(' / ')
+                              : 'ไม่มีบทบาทพนักงานประจำสาขา'}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="text-slate-600">สิทธิ์รับชำระเงิน</dt>
+                          <dd className="mt-1">
+                            {access.canReceivePayment
+                              ? 'มีสิทธิ์'
+                              : 'ไม่มีสิทธิ์'}
+                          </dd>
+                        </div>
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
 
             <button
               type="button"
