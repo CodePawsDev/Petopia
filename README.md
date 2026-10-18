@@ -14,6 +14,8 @@ The first planned business flow is grooming service booking. The project is curr
 - Business-unit and branch models.
 - Repeatable demo seed for one grooming business and two branches.
 - Automated tests and GitHub Actions CI.
+- Branch-scoped staff roles and receive-payment permissions with reusable guards.
+- Optional local demo accounts for customer, manager, groomer and payment access.
 
 ## Stack
 
@@ -107,6 +109,35 @@ The seed can run repeatedly without creating duplicate codes. Existing matching 
 
 Seeding is restricted to databases named `petopia_dev` or `petopia_test`.
 
+### Optional: Local demo accounts
+
+Demo accounts are optional and can only be seeded into `petopia_dev`.
+
+1. Run the baseline seed to create the business unit and branches.
+2. Set `DEMO_PASSWORD` in `apps/api/.env` to a password of 8–128 characters.
+3. Run from the repository root:
+
+```bash
+npm run prisma:seed:demo --workspace apps/api
+```
+
+| Email                           | Branch | Role or permission               |
+| ------------------------------- | ------ | -------------------------------- |
+| customer@demo.petopia.test      | —      | Customer; no staff permissions   |
+| manager.ari@demo.petopia.test   | Ari    | BRANCH_MANAGER                   |
+| groomer.ari@demo.petopia.test   | Ari    | GROOMER                          |
+| cashier.onnut@demo.petopia.test | Onnut  | RECEIVE_PAYMENT; no manager role |
+
+New accounts use the configured `DEMO_PASSWORD`.
+Running the demo seed again does not duplicate records or reset existing
+passwords, account status, assignments or grants.
+
+Changing `DEMO_PASSWORD` does not change passwords for existing accounts.
+Keep actual environment files out of Git.
+
+Demo accounts support local development and manual testing.
+Role-specific screens and business endpoints are implemented separately.
+
 ## 5. Prepare the test database
 
 From the repository root:
@@ -154,15 +185,15 @@ The web currently provides the frontend scaffold. Authentication can be exercise
 
 With the API running:
 
-| Request | Expected result |
-| --- | --- |
-| `GET /` | 200, `Hello World!` |
-| `GET /health/database` | 200, database connected |
-| `POST /auth/register` | 201 for a new valid account |
-| `POST /auth/login` | 200 and a session cookie |
-| `GET /auth/me` | 200 with the authenticated user's public fields |
-| `POST /auth/logout` | 204 |
-| `GET /auth/me` after logout | 401 |
+| Request                     | Expected result                                 |
+| --------------------------- | ----------------------------------------------- |
+| `GET /`                     | 200, `Hello World!`                             |
+| `GET /health/database`      | 200, database connected                         |
+| `POST /auth/register`       | 201 for a new valid account                     |
+| `POST /auth/login`          | 200 and a session cookie                        |
+| `GET /auth/me`              | 200 with the authenticated user's public fields |
+| `POST /auth/logout`         | 204                                             |
+| `GET /auth/me` after logout | 401                                             |
 
 Example registration body:
 
@@ -205,7 +236,7 @@ GitHub Actions runs:
 - Dependency installation using `npm ci`.
 - Prisma schema validation and client generation.
 - Migrations against a PostgreSQL test database.
-- Demo seed twice.
+- Baseline business and branch seed twice.
 - Lint, unit tests, E2E tests and builds.
 
 CI uses test-only database credentials and a test-only session secret.
