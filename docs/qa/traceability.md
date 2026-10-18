@@ -30,8 +30,7 @@ The mapping was reviewed against:
 - [Registration tests](../../apps/api/test/auth.e2e-spec.ts)
 - [Session authentication tests](../../apps/api/test/session-auth.e2e-spec.ts)
 
-TC-AUTH-001 through TC-AUTH-014 map to existing automated tests.
-TC-AUTH-015 remains planned.
+TC-AUTH-001 through TC-AUTH-015 map to existing automated tests.
 
 | Requirement ID | Acceptance criterion                                                                                            | Test case IDs                         | Coverage    |
 | -------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------- |
@@ -44,7 +43,8 @@ TC-AUTH-015 remains planned.
 | REQ-AUTH-007   | Logout returns 204, destroys the session and prevents reuse of the old cookie                                   | TC-AUTH-012                           | Implemented |
 | REQ-AUTH-008   | Deactivated users cannot continue using an existing session                                                     | TC-AUTH-013                           | Implemented |
 | REQ-AUTH-009   | Changing authVersion invalidates an old session; a fresh login can authenticate again                           | TC-AUTH-014                           | Implemented |
-| REQ-AUTH-010   | Expired sessions cannot access protected endpoints                                                              | TC-AUTH-015                           | Planned     |
+| REQ-AUTH-010  | Expired sessions cannot access protected endpoints | TC-AUTH-015 | Implemented |
+
 
 ## Test Case Index
 
