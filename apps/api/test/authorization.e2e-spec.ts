@@ -420,6 +420,164 @@ describe('Branch authorization (database integration)', () => {
     );
   });
 
+  describe('branch workspaces', () => {
+    const credentials = {
+      email: `e2e-authorization-${runId}@example.com`,
+      password: 'PetopiaTest2026!',
+    };
+
+    const branchA = {
+      id: branchAId,
+      code: `QA-A-${runId}`,
+      name: 'Test Branch A',
+    };
+
+    const branchB = {
+      id: branchBId,
+      code: `QA-B-${runId}`,
+      name: 'Test Branch B',
+    };
+
+    it.each([
+      { caseId: 'TC-AUTHZ-024', workspace: 'manager' },
+      { caseId: 'TC-AUTHZ-025', workspace: 'groomer' },
+      { caseId: 'TC-AUTHZ-026', workspace: 'payment' },
+    ])(
+      '[$caseId] rejects the $workspace workspace without a session',
+      async ({ workspace }) => {
+        await request(app.getHttpServer())
+          .get(`/branches/${branchAId}/workspaces/${workspace}`)
+          .expect(401);
+      },
+    );
+
+    it('[TC-AUTHZ-027] allows manager and payment workspaces only in the assigned branch', async () => {
+      const agent = request.agent(app.getHttpServer());
+
+      try {
+        await agent.post('/auth/login').send(credentials).expect(200);
+
+        for (const workspace of ['manager', 'payment']) {
+          await agent
+            .get(`/branches/${branchAId}/workspaces/${workspace}`)
+            .expect(200)
+            .expect('Cache-Control', 'no-store')
+            .expect({ workspace, branch: branchA });
+
+          await agent
+            .get(`/branches/${branchBId}/workspaces/${workspace}`)
+            .expect(403);
+        }
+
+        await agent
+          .get(`/branches/${branchAId}/workspaces/groomer`)
+          .expect(403);
+      } finally {
+        await agent.post('/auth/logout').expect(204);
+      }
+    });
+
+    it('[TC-AUTHZ-028] allows a groomer only in their assigned branch and removes access after revocation', async () => {
+      const agent = request.agent(app.getHttpServer());
+      const groomerAssignmentId = randomUUID();
+
+      try {
+        await prisma.staffAssignment.create({
+          data: {
+            id: groomerAssignmentId,
+            userId,
+            branchId: branchBId,
+            role: StaffRole.GROOMER,
+          },
+        });
+
+        await agent.post('/auth/login').send(credentials).expect(200);
+
+        await agent
+          .get(`/branches/${branchBId}/workspaces/groomer`)
+          .expect(200)
+          .expect('Cache-Control', 'no-store')
+          .expect({ workspace: 'groomer', branch: branchB });
+
+        await agent
+          .get(`/branches/${branchAId}/workspaces/groomer`)
+          .expect(403);
+
+        await agent
+          .get(`/branches/${branchBId}/workspaces/manager`)
+          .expect(403);
+
+        await agent
+          .get(`/branches/${branchBId}/workspaces/payment`)
+          .expect(403);
+
+        await prisma.staffAssignment.update({
+          where: { id: groomerAssignmentId },
+          data: { active: false },
+        });
+
+        await agent
+          .get(`/branches/${branchBId}/workspaces/groomer`)
+          .expect(403);
+      } finally {
+        try {
+          await agent.post('/auth/logout').expect(204);
+        } finally {
+          await prisma.staffAssignment.deleteMany({
+            where: { id: groomerAssignmentId },
+          });
+        }
+      }
+    });
+
+    it('[TC-AUTHZ-029] allows an explicit payment grant without granting manager or groomer access', async () => {
+      const agent = request.agent(app.getHttpServer());
+      const grantId = randomUUID();
+
+      try {
+        await prisma.permissionGrant.create({
+          data: {
+            id: grantId,
+            userId,
+            branchId: branchBId,
+            permission: StaffPermission.RECEIVE_PAYMENT,
+          },
+        });
+
+        await agent.post('/auth/login').send(credentials).expect(200);
+
+        await agent
+          .get(`/branches/${branchBId}/workspaces/payment`)
+          .expect(200)
+          .expect('Cache-Control', 'no-store')
+          .expect({ workspace: 'payment', branch: branchB });
+
+        for (const workspace of ['manager', 'groomer']) {
+          await agent
+            .get(`/branches/${branchBId}/workspaces/${workspace}`)
+            .expect(403);
+        }
+
+        await prisma.permissionGrant.update({
+          where: { id: grantId },
+          data: { active: false },
+        });
+
+        await agent
+          .get(`/branches/${branchBId}/workspaces/payment`)
+          .expect(403);
+      } finally {
+        try {
+          await agent.post('/auth/logout').expect(204);
+        } finally {
+          await prisma.permissionGrant.deleteMany({
+            where: { id: grantId },
+          });
+        }
+      }
+    });
+  });
+
   describe('receive payment', () => {
     afterEach(async () => {
       if (prisma) {

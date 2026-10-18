@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 type Branch = {
   id: string;
@@ -287,6 +288,37 @@ export default function AccountPage() {
                           </dd>
                         </div>
                       </dl>
+                      <nav
+                        aria-label={`เมนูทำงาน ${access.branch.name}`}
+                        className="mt-4 flex flex-wrap gap-2"
+                      >
+                        {access.roles.includes('BRANCH_MANAGER') && (
+                          <Link
+                            href={`/branches/${access.branch.id}/workspaces/manager`}
+                            className="rounded-lg border border-teal-700 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                          >
+                            จัดการสาขา
+                          </Link>
+                        )}
+
+                        {access.roles.includes('GROOMER') && (
+                          <Link
+                            href={`/branches/${access.branch.id}/workspaces/groomer`}
+                            className="rounded-lg border border-teal-700 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                          >
+                            งานของช่าง
+                          </Link>
+                        )}
+
+                        {access.canReceivePayment && (
+                          <Link
+                            href={`/branches/${access.branch.id}/workspaces/payment`}
+                            className="rounded-lg border border-teal-700 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                          >
+                            รับชำระเงิน
+                          </Link>
+                        )}
+                      </nav>
                     </li>
                   ))}
                 </ul>
