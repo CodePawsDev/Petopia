@@ -113,7 +113,7 @@ describe('Branch authorization (database integration)', () => {
     }
   });
 
-  it('allows an active manager in their assigned branch', async () => {
+  it('[TC-AUTHZ-001] allows an active manager in their assigned branch', async () => {
     await expect(
       authorization.requireBranchRole(
         userId,
@@ -123,7 +123,7 @@ describe('Branch authorization (database integration)', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('rejects access to another branch', async () => {
+  it('[TC-AUTHZ-002] rejects access to another branch', async () => {
     await expect(
       authorization.requireBranchRole(
         userId,
@@ -133,13 +133,13 @@ describe('Branch authorization (database integration)', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('rejects a role the user does not hold', async () => {
+  it('[TC-AUTHZ-003] rejects a role the user does not hold', async () => {
     await expect(
       authorization.requireBranchRole(userId, branchAId, StaffRole.GROOMER),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('rejects a user without an assignment', async () => {
+  it('[TC-AUTHZ-004] rejects a user without an assignment', async () => {
     await expect(
       authorization.requireBranchRole(
         randomUUID(),
@@ -149,7 +149,7 @@ describe('Branch authorization (database integration)', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('rejects an inactive assignment', async () => {
+  it('[TC-AUTHZ-005] rejects an inactive assignment', async () => {
     try {
       await prisma.staffAssignment.update({
         where: { id: assignmentId },
@@ -171,7 +171,7 @@ describe('Branch authorization (database integration)', () => {
     }
   });
 
-  it('rejects an inactive user', async () => {
+  it('[TC-AUTHZ-006] rejects an inactive user', async () => {
     try {
       await prisma.user.update({
         where: { id: userId },
@@ -193,7 +193,7 @@ describe('Branch authorization (database integration)', () => {
     }
   });
 
-  it('rejects an inactive branch', async () => {
+  it('[TC-AUTHZ-007] rejects an inactive branch', async () => {
     try {
       await prisma.branch.update({
         where: { id: branchAId },
@@ -215,7 +215,7 @@ describe('Branch authorization (database integration)', () => {
     }
   });
 
-  it('rejects an inactive business unit', async () => {
+  it('[TC-AUTHZ-008] rejects an inactive business unit', async () => {
     try {
       await prisma.businessUnit.update({
         where: { id: businessUnitId },
@@ -237,13 +237,13 @@ describe('Branch authorization (database integration)', () => {
     }
   });
 
-  it('returns 401 when accessing a manager route without a session', async () => {
+  it('[TC-AUTHZ-009] returns 401 when accessing a manager route without a session', async () => {
     await request(app.getHttpServer())
       .get(`/test/branches/${branchAId}/manager`)
       .expect(401);
   });
 
-  it('allows a logged-in manager in their branch and rejects another branch', async () => {
+  it('[TC-AUTHZ-010] allows a logged-in manager in their branch and rejects another branch', async () => {
     const agent = request.agent(app.getHttpServer());
 
     await agent
@@ -275,19 +275,19 @@ describe('Branch authorization (database integration)', () => {
       }
     });
 
-    it('allows a branch manager without an explicit payment grant', async () => {
+    it('[TC-AUTHZ-011]allows a branch manager without an explicit payment grant', async () => {
       await expect(
         authorization.requireReceivePayment(userId, branchAId),
       ).resolves.toBeUndefined();
     });
 
-    it('rejects a manager requesting payment access in another branch', async () => {
+    it('[TC-AUTHZ-012] rejects a manager requesting payment access in another branch', async () => {
       await expect(
         authorization.requireReceivePayment(userId, branchBId),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it('allows an active payment grant without a manager role in that branch', async () => {
+    it('[TC-AUTHZ-013]allows an active payment grant without a manager role in that branch', async () => {
       await prisma.permissionGrant.create({
         data: {
           userId,
@@ -309,7 +309,7 @@ describe('Branch authorization (database integration)', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it('rejects an inactive payment grant', async () => {
+    it('[TC-AUTHZ-014]rejects an inactive payment grant', async () => {
       await prisma.permissionGrant.create({
         data: {
           userId,
@@ -324,9 +324,13 @@ describe('Branch authorization (database integration)', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it.each(['user', 'branch', 'business'] as const)(
-      'rejects a payment grant when its %s is inactive',
-      async (target) => {
+    it.each([
+      { caseId: 'TC-AUTHZ-015', target: 'user' },
+      { caseId: 'TC-AUTHZ-016', target: 'branch' },
+      { caseId: 'TC-AUTHZ-017', target: 'business' },
+    ] as const)(
+      '[$caseId] rejects a payment grant when its $target is inactive',
+      async ({ target }) => {
         await prisma.permissionGrant.create({
           data: {
             userId,
@@ -377,7 +381,7 @@ describe('Branch authorization (database integration)', () => {
       },
     );
 
-    it('allows payment access with a grant without allowing manager access', async () => {
+    it('[TC-AUTHZ-018] allows payment access with a grant without allowing manager access', async () => {
       const agent = request.agent(app.getHttpServer());
 
       await agent

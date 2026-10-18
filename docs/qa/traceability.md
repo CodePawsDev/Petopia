@@ -6,6 +6,8 @@ Status: Draft
 
 - REQ-AUTH-001: authentication requirement
 - TC-AUTH-001: authentication test case
+- REQ-AUTHZ-001: authorization requirement
+- TC-AUTHZ-001: authorization test case
 - Other modules will use PET, CATALOG, AVAIL, BOOKING, SERVICE and PAYMENT.
 - IDs remain stable when wording or implementation changes.
 - Retired IDs are not reused.
@@ -62,7 +64,50 @@ TC-AUTH-015 remains planned.
 | TC-AUTH-012  | Log out and reject both the agent session and replayed cookie          |
 | TC-AUTH-013  | Reject existing session after user deactivation                        |
 | TC-AUTH-014  | Reject old authVersion and allow fresh login                           |
-| TC-AUTH-015  | Reject expired session                                                 |
+| TC-AUTH-015 | Reject expired session |
+
+## Branch Authorization
+
+Authorization checks are implemented in:
+
+- [Authorization tests](../../apps/api/test/authorization.e2e-spec.ts)
+- [Test-only controller](../../apps/api/test/helpers/authorization-test.controller.ts)
+
+The suite includes database integration tests and HTTP tests against
+test-only routes. Production business endpoints must apply these guards
+and enforce resource ownership when implemented.
+
+| Requirement ID | Acceptance criterion | Test case IDs | Coverage |
+| --- | --- | --- | --- |
+| REQ-AUTHZ-001 | Branch-role access requires an active assignment for the requested role and branch | TC-AUTHZ-001–005 | Implemented |
+| REQ-AUTHZ-002 | Branch-role access is denied when the user, branch or business unit is inactive | TC-AUTHZ-006–008 | Implemented |
+| REQ-AUTHZ-003 | Manager routes require an authenticated session and enforce branch scope over HTTP | TC-AUTHZ-009–010 | Implemented |
+| REQ-AUTHZ-004 | Payment access requires an active branch-manager assignment or an active RECEIVE_PAYMENT grant in the requested branch | TC-AUTHZ-011–014 | Implemented |
+| REQ-AUTHZ-005 | Payment grants do not allow access when the user, branch or business unit is inactive | TC-AUTHZ-015–017 | Implemented |
+| REQ-AUTHZ-006 | Payment grants allow payment access without manager access; revocation takes effect on the next request | TC-AUTHZ-018 | Implemented |
+
+### Authorization Test Case Index
+
+| Test case ID | Scenario |
+| --- | --- |
+| TC-AUTHZ-001 | Allow an active manager in their assigned branch |
+| TC-AUTHZ-002 | Reject role access to another branch |
+| TC-AUTHZ-003 | Reject a role the user does not hold |
+| TC-AUTHZ-004 | Reject access without a matching assignment |
+| TC-AUTHZ-005 | Reject an inactive assignment |
+| TC-AUTHZ-006 | Reject role access for an inactive user |
+| TC-AUTHZ-007 | Reject role access to an inactive branch |
+| TC-AUTHZ-008 | Reject role access under an inactive business unit |
+| TC-AUTHZ-009 | Return 401 for a manager route without a session |
+| TC-AUTHZ-010 | Allow the assigned branch and reject another branch over HTTP |
+| TC-AUTHZ-011 | Allow a branch manager to receive payment without an explicit grant |
+| TC-AUTHZ-012 | Reject payment access in another branch without a grant |
+| TC-AUTHZ-013 | Allow an active payment grant without granting the manager role |
+| TC-AUTHZ-014 | Reject an inactive payment grant |
+| TC-AUTHZ-015 | Reject payment-grant access for an inactive user |
+| TC-AUTHZ-016 | Reject payment-grant access to an inactive branch |
+| TC-AUTHZ-017 | Reject payment-grant access under an inactive business unit |
+| TC-AUTHZ-018 | Verify payment access, manager denial and grant revocation over HTTP |                                              |
 
 ## Maintenance
 
