@@ -242,4 +242,69 @@ describe('Session authentication (e2e)', () => {
       await agent.post('/auth/logout').expect(204);
     }
   });
+  it('[TC-AUTH-015] should reject an expired session even when its cookie is replayed', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+
+    const headers = loginResponse.headers as Record<string, unknown>;
+    const rawCookies = headers['set-cookie'];
+
+    if (
+      !Array.isArray(rawCookies) ||
+      !rawCookies.every(
+        (value: unknown): value is string => typeof value === 'string',
+      )
+    ) {
+      throw new Error('Expected session cookies in the login response');
+    }
+
+    const sessionCookie = rawCookies.find((cookie) =>
+      cookie.startsWith('petopia.sid='),
+    );
+
+    if (!sessionCookie) {
+      throw new Error('Expected a petopia.sid cookie');
+    }
+
+    const cookie = sessionCookie.split(';')[0];
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email },
+      select: { id: true },
+    });
+
+    const session = await prisma.session.findFirstOrThrow({
+      where: {
+        sess: {
+          path: ['userId'],
+          equals: user.id,
+        },
+      },
+    });
+
+    try {
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Cookie', cookie)
+        .expect(200);
+
+      await prisma.session.update({
+        where: { sid: session.sid },
+        data: {
+          expire: new Date(Date.now() - 60_000),
+        },
+      });
+
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Cookie', cookie)
+        .expect(401);
+    } finally {
+      await prisma.session.deleteMany({
+        where: { sid: session.sid },
+      });
+    }
+  });
 });
