@@ -9,14 +9,16 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique @db.VarChar(254)
-  passwordHash String   @map("password_hash")
-  displayName  String   @map("display_name") @db.VarChar(100)
-  active       Boolean  @default(true)
-  authVersion  Int      @default(1) @map("auth_version")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id               String            @id @default(uuid()) @db.Uuid
+  email            String            @unique @db.VarChar(254)
+  passwordHash     String            @map("password_hash")
+  displayName      String            @map("display_name") @db.VarChar(100)
+  active           Boolean           @default(true)
+  authVersion      Int               @default(1) @map("auth_version")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  staffAssignments StaffAssignment[]
+  permissionGrants PermissionGrant[]
 
   @@map("users")
 }
@@ -44,15 +46,17 @@ model BusinessUnit {
 }
 
 model Branch {
-  id              String   @id @default(uuid()) @db.Uuid
-  businessUnitId  String   @map("business_unit_id") @db.Uuid
-  code            String   @unique @db.VarChar(50)
-  name            String   @db.VarChar(100)
-  timezone        String   @default("Asia/Bangkok") @db.VarChar(100)
-  active          Boolean  @default(true)
-  scheduleVersion Int      @default(1) @map("schedule_version")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id               String            @id @default(uuid()) @db.Uuid
+  businessUnitId   String            @map("business_unit_id") @db.Uuid
+  code             String            @unique @db.VarChar(50)
+  name             String            @db.VarChar(100)
+  timezone         String            @default("Asia/Bangkok") @db.VarChar(100)
+  active           Boolean           @default(true)
+  scheduleVersion  Int               @default(1) @map("schedule_version")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  staffAssignments StaffAssignment[]
+  permissionGrants PermissionGrant[]
 
   businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
 
@@ -60,4 +64,45 @@ model Branch {
   @@map("branches")
 }
 
+enum StaffRole {
+  GROOMER
+  BRANCH_MANAGER
+}
 
+enum StaffPermission {
+  RECEIVE_PAYMENT
+}
+
+model StaffAssignment {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  branchId  String    @map("branch_id") @db.Uuid
+  role      StaffRole
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, branchId, role])
+  @@index([branchId, role, active])
+  @@map("staff_assignments")
+}
+
+model PermissionGrant {
+  id         String          @id @default(uuid()) @db.Uuid
+  userId     String          @map("user_id") @db.Uuid
+  branchId   String          @map("branch_id") @db.Uuid
+  permission StaffPermission
+  active     Boolean         @default(true)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, branchId, permission])
+  @@index([branchId, permission, active])
+  @@map("permission_grants")
+}
