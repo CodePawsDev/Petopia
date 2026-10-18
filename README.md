@@ -16,6 +16,11 @@ The first planned business flow is grooming service booking. The project is curr
 - Automated tests and GitHub Actions CI.
 - Branch-scoped staff roles and receive-payment permissions with reusable guards.
 - Optional local demo accounts for customer, manager, groomer and payment access.
+- Web login, account details and logout.
+- Current-user response includes active branch roles and explicit permission grants.
+- Role-based navigation to manager, groomer and payment workspaces.
+- Workspace APIs enforce session authentication and branch-scoped access.
+- Workspace pages display branch context; business operations are not implemented yet.
 
 ## Stack
 
@@ -136,7 +141,11 @@ Changing `DEMO_PASSWORD` does not change passwords for existing accounts.
 Keep actual environment files out of Git.
 
 Demo accounts support local development and manual testing.
-Role-specific screens and business endpoints are implemented separately.
+After logging in, the account page displays branch access and available workspace links.
+
+Managers can access the manager and payment workspaces in their assigned branch.
+Groomers can access the groomer workspace in their assigned branch.
+An explicit RECEIVE_PAYMENT grant permits payment workspace access without granting manager or groomer access.
 
 ## 5. Prepare the test database
 
@@ -179,21 +188,27 @@ npm run dev:web
 - Web: http://localhost:3000
 - API: http://localhost:3001
 
-The web currently provides the frontend scaffold. Authentication can be exercised through the API.
+Open http://localhost:3000/login to sign in with an existing account.
+The account page displays public account details, branch access and workspace navigation.
+
+The web forwards `/api/*` requests to the local API at http://localhost:3001.
+This rewrite currently targets local development and must be configured before deployment.
+
+Registration is currently available through the API; a registration page is not implemented yet.
 
 ## 7. Smoke checks
 
 With the API running:
 
-| Request                     | Expected result                                 |
-| --------------------------- | ----------------------------------------------- |
-| `GET /`                     | 200, `Hello World!`                             |
-| `GET /health/database`      | 200, database connected                         |
-| `POST /auth/register`       | 201 for a new valid account                     |
-| `POST /auth/login`          | 200 and a session cookie                        |
-| `GET /auth/me`              | 200 with the authenticated user's public fields |
-| `POST /auth/logout`         | 204                                             |
-| `GET /auth/me` after logout | 401                                             |
+| Request                     | Expected result                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| `GET /`                     | 200, `Hello World!`                                                                     |
+| `GET /health/database`      | 200, database connected                                                                 |
+| `POST /auth/register`       | 201 for a new valid account                                                             |
+| `POST /auth/login`          | 200 and a session cookie                                                                |
+| `GET /auth/me`              | 200 with public account fields, active staff assignments and explicit permission grants |
+| `POST /auth/logout`         | 204                                                                                     |
+| `GET /auth/me` after logout | 401                                                                                     |
 
 Example registration body:
 
@@ -217,6 +232,37 @@ Example login body:
 Use a new email if the example account already exists. Login uses the account created through registration.
 
 In Postman, use raw JSON for registration and login. Keep its cookie jar enabled and use the same hostname throughout. Current-user and logout requests require no body.
+
+### Browser and workspace checks
+
+Log out before switching between demo accounts.
+
+| Account               | Expected workspace access          |
+| --------------------- | ---------------------------------- |
+| Customer              | No staff workspace links           |
+| Ari manager           | Ari manager and payment workspaces |
+| Ari groomer           | Ari groomer workspace              |
+| Onnut payment account | Onnut payment workspace            |
+
+Authorized workspace pages display the selected branch and placeholder content.
+
+API workspace endpoints:
+
+- GET /branches/:branchId/workspaces/manager
+- GET /branches/:branchId/workspaces/groomer
+- GET /branches/:branchId/workspaces/payment
+
+Use the branch UUID as branchId, not its code.
+Workspace API requests return 401 without authentication and 403 without the required branch access.
+Successful responses include Cache-Control: no-store.
+
+Verify that entering a workspace URL directly does not bypass authorization.
+Unauthenticated browser requests redirect to login.
+Unknown workspace types display a 404 page.
+
+Browser checks are currently manual. API authorization checks are automated.
+
+QA documentation: [Requirement traceability](docs/qa/traceability.md).
 
 ## 8. Automated checks
 
@@ -266,6 +312,6 @@ Commit migration files. Do not edit migrations that have already been applied an
 - Grooming services, pricing and staff schedules.
 - Availability and booking.
 - Branch operations and payment recording.
-- Frontend integration.
+- Frontend integration for pet profiles, booking and branch operations.
 
 Planned features are not included in the current implementation.
