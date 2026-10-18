@@ -8,6 +8,6 @@ import { SessionAuthGuard } from './guards/session-auth.guard';
   imports: [PrismaModule],
   controllers: [AuthController],
   providers: [AuthService, SessionAuthGuard],
-  exports: [SessionAuthGuard],
+  exports: [AuthService, SessionAuthGuard],
 })
 export class AuthModule {}
