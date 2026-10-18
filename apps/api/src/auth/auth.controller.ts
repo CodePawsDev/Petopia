@@ -9,6 +9,7 @@ import {
   Req,
   Res,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -75,7 +76,14 @@ export class AuthController {
   @UseGuards(SessionAuthGuard)
   @Header('Cache-Control', 'no-store')
   me(@Req() req: AuthenticatedRequest) {
-    return req.currentUser;
+    if (!req.currentUser) {
+      throw new UnauthorizedException('Authentication required');
+    }
+
+    return this.authService.getCurrentUserAccess(
+      req.currentUser.id,
+      req.session.authVersion,
+    );
   }
 
   @Post('logout')

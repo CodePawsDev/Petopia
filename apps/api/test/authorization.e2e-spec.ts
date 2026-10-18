@@ -266,6 +266,160 @@ describe('Branch authorization (database integration)', () => {
     }
   });
 
+  describe('current-user access', () => {
+    const expectedAssignment = {
+      role: StaffRole.BRANCH_MANAGER,
+      branch: {
+        id: branchAId,
+        code: `QA-A-${runId}`,
+        name: 'Test Branch A',
+      },
+    };
+
+    const expectedGrant = {
+      permission: StaffPermission.RECEIVE_PAYMENT,
+      branch: {
+        id: branchBId,
+        code: `QA-B-${runId}`,
+        name: 'Test Branch B',
+      },
+    };
+
+    it('[TC-AUTHZ-019] returns public account fields and active branch access', async () => {
+      const agent = request.agent(app.getHttpServer());
+
+      const grant = await prisma.permissionGrant.create({
+        data: {
+          userId,
+          branchId: branchBId,
+          permission: StaffPermission.RECEIVE_PAYMENT,
+        },
+      });
+
+      try {
+        await agent
+          .post('/auth/login')
+          .send({
+            email: `e2e-authorization-${runId}@example.com`,
+            password: 'PetopiaTest2026!',
+          })
+          .expect(200);
+
+        await agent
+          .get('/auth/me')
+          .expect(200)
+          .expect('Cache-Control', 'no-store')
+          .expect({
+            id: userId,
+            email: `e2e-authorization-${runId}@example.com`,
+            displayName: 'Authorization Test',
+            staffAssignments: [expectedAssignment],
+            permissionGrants: [expectedGrant],
+          });
+      } finally {
+        try {
+          await agent.post('/auth/logout').expect(204);
+        } finally {
+          await prisma.permissionGrant.deleteMany({
+            where: { id: grant.id },
+          });
+        }
+      }
+    });
+
+    it.each([
+      { caseId: 'TC-AUTHZ-020', target: 'assignment' },
+      { caseId: 'TC-AUTHZ-021', target: 'grant' },
+      { caseId: 'TC-AUTHZ-022', target: 'branch' },
+      { caseId: 'TC-AUTHZ-023', target: 'business' },
+    ] as const)(
+      '[$caseId] updates current-user access when $target becomes inactive',
+      async ({ target }) => {
+        const agent = request.agent(app.getHttpServer());
+
+        const grant = await prisma.permissionGrant.create({
+          data: {
+            userId,
+            branchId: branchBId,
+            permission: StaffPermission.RECEIVE_PAYMENT,
+          },
+        });
+
+        async function setActive(active: boolean) {
+          if (target === 'assignment') {
+            await prisma.staffAssignment.update({
+              where: { id: assignmentId },
+              data: { active },
+            });
+          } else if (target === 'grant') {
+            await prisma.permissionGrant.update({
+              where: { id: grant.id },
+              data: { active },
+            });
+          } else if (target === 'branch') {
+            await prisma.branch.updateMany({
+              where: { id: { in: [branchAId, branchBId] } },
+              data: { active },
+            });
+          } else {
+            await prisma.businessUnit.update({
+              where: { id: businessUnitId },
+              data: { active },
+            });
+          }
+        }
+
+        try {
+          await agent
+            .post('/auth/login')
+            .send({
+              email: `e2e-authorization-${runId}@example.com`,
+              password: 'PetopiaTest2026!',
+            })
+            .expect(200);
+
+          const publicUser = {
+            id: userId,
+            email: `e2e-authorization-${runId}@example.com`,
+            displayName: 'Authorization Test',
+          };
+
+          await agent
+            .get('/auth/me')
+            .expect(200)
+            .expect({
+              ...publicUser,
+              staffAssignments: [expectedAssignment],
+              permissionGrants: [expectedGrant],
+            });
+
+          await setActive(false);
+
+          await agent
+            .get('/auth/me')
+            .expect(200)
+            .expect({
+              ...publicUser,
+              staffAssignments: target === 'grant' ? [expectedAssignment] : [],
+              permissionGrants: target === 'assignment' ? [expectedGrant] : [],
+            });
+        } finally {
+          try {
+            await setActive(true);
+          } finally {
+            try {
+              await agent.post('/auth/logout').expect(204);
+            } finally {
+              await prisma.permissionGrant.deleteMany({
+                where: { id: grant.id },
+              });
+            }
+          }
+        }
+      },
+    );
+  });
+
   describe('receive payment', () => {
     afterEach(async () => {
       if (prisma) {

@@ -117,7 +117,11 @@ describe('Session authentication (e2e)', () => {
       .get('/auth/me')
       .expect(200)
       .expect('Cache-Control', 'no-store')
-      .expect(user);
+      .expect({
+        ...user,
+        staffAssignments: [],
+        permissionGrants: [],
+      });
 
     const logoutResponse = await agent.post('/auth/logout').expect(204);
 
