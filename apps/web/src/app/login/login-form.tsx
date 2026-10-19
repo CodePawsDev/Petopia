@@ -2,7 +2,6 @@
 
 import { useRef, useState, type FormEvent } from 'react';
 
-
 export default function LoginForm() {
   const submitting = useRef(false);
   const [isPending, setIsPending] = useState(false);
@@ -58,6 +57,8 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit} aria-busy={isPending}>
       <fieldset disabled={isPending} className="space-y-5">
+        <legend className="sr-only">ข้อมูลเข้าสู่ระบบ</legend>
+
         <div>
           <label htmlFor="email" className="mb-2 block text-sm font-medium">
             อีเมล
@@ -71,7 +72,8 @@ export default function LoginForm() {
             spellCheck={false}
             required
             maxLength={254}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+            placeholder="you@example.com"
+            className="min-h-12 w-full rounded-xl border border-input-border bg-surface px-4 py-3 text-base text-foreground placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60"
           />
         </div>
 
@@ -85,20 +87,23 @@ export default function LoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+            className="min-h-12 w-full rounded-xl border border-input-border bg-surface px-4 py-3 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60"
           />
         </div>
 
         <button
           type="submit"
-          className="w-full rounded-lg bg-teal-700 px-4 py-3 font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:cursor-wait disabled:opacity-60"
+          className="min-h-12 w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60"
         >
           {isPending ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
         </button>
       </fieldset>
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-red-700">
+        <p
+          role="alert"
+          className="mt-5 rounded-xl border border-danger/30 bg-surface-soft px-4 py-3 text-sm text-danger"
+        >
           {error}
         </p>
       )}
