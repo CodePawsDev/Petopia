@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 type Branch = {
   id: string;
@@ -207,70 +208,141 @@ export default function AccountPage() {
   }
 
   const branchAccess = account ? getBranchAccess(account) : [];
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 text-slate-900">
-      <section
-        aria-labelledby="account-heading"
-        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
-      >
-        <p className="mb-2 text-sm font-semibold text-teal-700">Petopia</p>
-        <h1 id="account-heading" className="mb-6 text-2xl font-bold">
-          บัญชีของฉัน
-        </h1>
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="border-b border-border bg-surface">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
+          <span className="text-2xl font-bold">
+            <span aria-hidden="true" className="mr-2 text-primary">
+              ✦
+            </span>
+            Petopia
+          </span>
+          <span className="text-sm text-muted">บัญชีของฉัน</span>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
+        <div className="mb-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="mb-2 text-sm font-medium text-primary">
+              พื้นที่สำหรับคุณและสัตว์เลี้ยงที่คุณรัก
+            </p>
+            <h1 className="break-words text-3xl font-bold leading-relaxed sm:text-4xl">
+              {account ? `สวัสดี คุณ${account.displayName}` : 'บัญชีของฉัน'}
+            </h1>
+            <p className="mt-2 text-muted">ยินดีต้อนรับสู่ Petopia</p>
+          </div>
+
+          <Image
+            src="/images/petopia-companions.png"
+            alt=""
+            width={1536}
+            height={1024}
+            sizes="(min-width: 640px) 288px, 224px"
+            className="h-auto w-56 shrink-0 self-center sm:w-72"
+          />
+        </div>
 
         {loadError ? (
-          <div>
-            <p role="alert" className="text-sm text-red-700">
+          <section className="rounded-3xl border border-border bg-surface p-8">
+            <h2 className="mb-3 text-xl font-semibold">ข้อมูลบัญชี</h2>
+            <p role="alert" className="text-danger">
               {loadError}
             </p>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-4 rounded-lg border border-slate-300 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+              className="mt-5 min-h-12 rounded-xl border border-primary px-5 py-3 font-medium text-primary hover:bg-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               ลองอีกครั้ง
             </button>
-          </div>
+          </section>
         ) : account ? (
-          <>
-            <dl className="space-y-4">
-              <div>
-                <dt className="text-sm text-slate-600">ชื่อที่แสดง</dt>
-                <dd className="mt-1 font-medium">{account.displayName}</dd>
-              </div>
-              <div>
-                <dt className="text-sm text-slate-600">อีเมล</dt>
-                <dd className="mt-1 break-all">{account.email}</dd>
-              </div>
-            </dl>
+          <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
             <section
-              aria-labelledby="branch-access-heading"
-              className="mt-8 border-t border-slate-200 pt-6"
+              aria-labelledby="profile-heading"
+              className="min-w-0 rounded-3xl border border-border bg-surface p-6 shadow-sm sm:p-8"
             >
-              <h2 id="branch-access-heading" className="text-lg font-semibold">
-                สิทธิ์การทำงานตามสาขา
+              <h2 id="profile-heading" className="text-xl font-bold">
+                บัญชีของฉัน
               </h2>
 
+              <div
+                aria-hidden="true"
+                className="mx-auto my-7 flex size-24 items-center justify-center rounded-full bg-surface-soft text-4xl font-bold text-primary"
+              >
+                {Array.from(account.displayName)[0]}
+              </div>
+
+              <dl className="space-y-5">
+                <div>
+                  <dt className="text-sm text-muted">ชื่อที่แสดง</dt>
+                  <dd className="mt-1 break-words text-lg font-semibold">
+                    {account.displayName}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted">อีเมล</dt>
+                  <dd className="mt-1 break-all">{account.email}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-7 border-t border-border pt-6">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="min-h-12 w-full rounded-xl border border-primary px-4 py-3 font-semibold text-primary hover:bg-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isLoggingOut ? 'กำลังออกจากระบบ…' : 'ออกจากระบบ'}
+                </button>
+
+                {logoutError && (
+                  <p role="alert" className="mt-4 text-sm text-danger">
+                    {logoutError}
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section
+              aria-labelledby="branch-access-heading"
+              className="min-w-0 rounded-3xl border border-border bg-surface p-6 shadow-sm sm:p-8"
+            >
+              <h2 id="branch-access-heading" className="text-xl font-bold">
+                พื้นที่ทำงานของคุณ
+              </h2>
+              <p className="mt-2 text-sm text-muted">
+                พื้นที่ทำงานที่คุณมีสิทธิ์เข้าใช้งานในแต่ละสาขา
+              </p>
+
               {branchAccess.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-600">
-                  บัญชีนี้ใช้งานในฐานะลูกค้า และไม่มีสิทธิ์พนักงาน
-                </p>
+                <div className="mt-6 rounded-2xl bg-surface-soft p-6">
+                  <p className="font-semibold">คุณกำลังใช้งานในฐานะลูกค้า</p>
+                  <p className="mt-2 text-sm leading-7 text-muted">
+                    บัญชีนี้ไม่มีสิทธิ์พนักงาน จึงไม่มีเมนูพื้นที่ทำงานของสาขา
+                  </p>
+                </div>
               ) : (
-                <ul className="mt-4 space-y-4">
+                <ul className="mt-6 space-y-6">
                   {branchAccess.map((access) => (
                     <li
                       key={access.branch.id}
-                      className="rounded-xl border border-slate-200 p-4"
+                      className="rounded-2xl border border-border p-5"
                     >
-                      <h3 className="font-semibold">{access.branch.name}</h3>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <h3 className="break-words text-lg font-semibold">
+                        {access.branch.name}
+                      </h3>
+                      <p className="mt-1 break-all text-xs text-muted">
                         {access.branch.code}
                       </p>
 
-                      <dl className="mt-3 space-y-3 text-sm">
+                      <dl className="mt-4 space-y-3 text-sm">
                         <div>
-                          <dt className="text-slate-600">บทบาท</dt>
-                          <dd className="mt-1">
+                          <dt className="text-muted">บทบาท</dt>
+                          <dd className="mt-1 font-medium">
                             {access.roles.length > 0
                               ? access.roles
                                   .map((role) => roleLabels[role])
@@ -278,44 +350,53 @@ export default function AccountPage() {
                               : 'ไม่มีบทบาทพนักงานประจำสาขา'}
                           </dd>
                         </div>
-
                         <div>
-                          <dt className="text-slate-600">สิทธิ์รับชำระเงิน</dt>
-                          <dd className="mt-1">
+                          <dt className="text-muted">สิทธิ์รับชำระเงิน</dt>
+                          <dd className="mt-1 font-medium">
                             {access.canReceivePayment
                               ? 'มีสิทธิ์'
                               : 'ไม่มีสิทธิ์'}
                           </dd>
                         </div>
                       </dl>
+
                       <nav
                         aria-label={`เมนูทำงาน ${access.branch.name}`}
-                        className="mt-4 flex flex-wrap gap-2"
+                        className="mt-5 grid gap-3"
                       >
                         {access.roles.includes('BRANCH_MANAGER') && (
                           <Link
                             href={`/branches/${access.branch.id}/workspaces/manager`}
-                            className="rounded-lg border border-teal-700 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                            className="flex min-h-14 items-center justify-between gap-4 rounded-xl border border-border bg-surface-soft px-4 py-3 font-medium hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                           >
-                            จัดการสาขา
+                            <span>ผู้จัดการสาขา</span>
+                            <span aria-hidden="true" className="text-primary">
+                              →
+                            </span>
                           </Link>
                         )}
 
                         {access.roles.includes('GROOMER') && (
                           <Link
                             href={`/branches/${access.branch.id}/workspaces/groomer`}
-                            className="rounded-lg border border-teal-700 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                            className="flex min-h-14 items-center justify-between gap-4 rounded-xl border border-border bg-surface-soft px-4 py-3 font-medium hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                           >
-                            งานของช่าง
+                            <span>งานของช่าง</span>
+                            <span aria-hidden="true" className="text-primary">
+                              →
+                            </span>
                           </Link>
                         )}
 
                         {access.canReceivePayment && (
                           <Link
                             href={`/branches/${access.branch.id}/workspaces/payment`}
-                            className="rounded-lg border border-teal-700 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                            className="flex min-h-14 items-center justify-between gap-4 rounded-xl border border-border bg-surface-soft px-4 py-3 font-medium hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                           >
-                            รับชำระเงิน
+                            <span>รับชำระเงิน</span>
+                            <span aria-hidden="true" className="text-primary">
+                              →
+                            </span>
                           </Link>
                         )}
                       </nav>
@@ -324,28 +405,16 @@ export default function AccountPage() {
                 </ul>
               )}
             </section>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="mt-8 w-full rounded-lg bg-teal-700 px-4 py-3 font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:cursor-wait disabled:opacity-60"
-            >
-              {isLoggingOut ? 'กำลังออกจากระบบ…' : 'ออกจากระบบ'}
-            </button>
-
-            {logoutError && (
-              <p role="alert" className="mt-4 text-sm text-red-700">
-                {logoutError}
-              </p>
-            )}
-          </>
+          </div>
         ) : (
-          <p role="status" className="text-sm text-slate-600">
+          <p
+            role="status"
+            className="rounded-3xl border border-border bg-surface p-8 text-muted"
+          >
             กำลังตรวจสอบบัญชี…
           </p>
         )}
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
