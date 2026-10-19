@@ -19,6 +19,7 @@ model User {
   updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   staffAssignments StaffAssignment[]
   permissionGrants PermissionGrant[]
+  pets             Pet[]
 
   @@map("users")
 }
@@ -105,4 +106,29 @@ model PermissionGrant {
   @@unique([userId, branchId, permission])
   @@index([branchId, permission, active])
   @@map("permission_grants")
+}
+
+enum PetSpecies {
+  DOG
+  CAT
+  RABBIT
+}
+
+model Pet {
+  id         String     @id @default(uuid()) @db.Uuid
+  ownerId    String     @map("owner_id") @db.Uuid
+  name       String     @db.VarChar(100)
+  species    PetSpecies
+  breed      String?    @db.VarChar(100)
+  birthDate  DateTime?  @map("birth_date") @db.Date
+  weightKg   Decimal?   @map("weight_kg") @db.Decimal(6, 3)
+  careNotes  String?    @map("care_notes") @db.VarChar(2000)
+  archivedAt DateTime?  @map("archived_at") @db.Timestamptz(3)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  @@index([ownerId, archivedAt])
+  @@map("pets")
 }

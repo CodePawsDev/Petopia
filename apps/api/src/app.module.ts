@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SessionModule } from './session/session.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { BranchWorkspaceModule } from './branch-workspace/branch-workspace.module';
+import { PetsModule } from './pets/pets.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { BranchWorkspaceModule } from './branch-workspace/branch-workspace.modul
     SessionModule,
     AuthorizationModule,
     BranchWorkspaceModule,
+    PetsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

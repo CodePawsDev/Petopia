@@ -130,6 +130,51 @@ are implemented.
 | TC-AUTHZ-029 | Verify explicit payment access, role separation and grant revocation                                              |
 | TC-AUTHZ-030 | Isolate account data and branch access between two users; logging out one user preserves the other user's session |
 
+## Pet profiles
+
+API coverage is mapped to [Pet profile tests](../../apps/api/test/pets.e2e-spec.ts).
+
+These cases cover the API. Browser forms and browser interaction tests are tracked separately.
+
+| Requirement ID | Acceptance criterion                                                                                   | Test case IDs                                                                                              | Coverage    |
+| -------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ----------- |
+| REQ-PET-001    | Create a pet using the authenticated owner, normalize text and return the expected response fields     | TC-PET-001                                                                                                 | Implemented |
+| REQ-PET-002    | Update supplied fields, preserve omitted fields and allow clearing optional fields with null           | TC-PET-002                                                                                                 | Implemented |
+| REQ-PET-003    | Archive and restore the same pet without deleting data; separate active and archived lists             | TC-PET-003                                                                                                 | Implemented |
+| REQ-PET-004    | Reject invalid archive filters, invalid profile input and client-supplied ownership or archive changes | TC-PET-004, TC-PET-005, TC-PET-006, TC-PET-007, TC-PET-008, TC-PET-009, TC-PET-010, TC-PET-011, TC-PET-012 | Implemented |
+| REQ-PET-005    | Require an authenticated session for all pet endpoints                                                 | TC-PET-013                                                                                                 | Implemented |
+| REQ-PET-006    | Prevent another account from listing, reading, updating, archiving or restoring owned pets             | TC-PET-014                                                                                                 | Implemented |
+| REQ-PET-007    | Reject malformed pet IDs with 400 and return 404 for nonexistent pet IDs                               | TC-PET-015, TC-PET-016                                                                                     | Implemented |
+
+### Pet test case index
+
+| Test case ID | Scenario                                                          |
+| ------------ | ----------------------------------------------------------------- |
+| TC-PET-001   | Create a pet with normalized input and session ownership          |
+| TC-PET-002   | Partially update a pet and clear optional fields                  |
+| TC-PET-003   | Archive, list, read and restore a pet; repeat archive and restore |
+| TC-PET-004   | Reject an invalid archived query                                  |
+| TC-PET-005   | Reject a blank name                                               |
+| TC-PET-006   | Reject an unsupported species                                     |
+| TC-PET-007   | Reject zero weight                                                |
+| TC-PET-008   | Reject weight with more than three decimal places                 |
+| TC-PET-009   | Reject an invalid calendar date                                   |
+| TC-PET-010   | Reject a future birth date                                        |
+| TC-PET-011   | Reject a client-supplied owner during creation                    |
+| TC-PET-012   | Reject invalid updates without changing stored data               |
+| TC-PET-013   | Reject all pet endpoints without a session                        |
+| TC-PET-014   | Prevent access and changes across accounts                        |
+| TC-PET-015   | Reject malformed pet IDs                                          |
+| TC-PET-016   | Reject nonexistent pet IDs                                        |
+
+### Deferred booking integration
+
+- Prevent archived pets from being used in new bookings.
+- Preserve access to historical booking information after pet archival.
+- Define which booking statuses block archival and handle concurrent booking and archival requests.
+
+These booking rules are not implemented or covered by the current pet API tests.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.
