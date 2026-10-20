@@ -290,6 +290,12 @@ export default function AccountPage() {
               </dl>
 
               <div className="mt-7 border-t border-border pt-6">
+                <Link
+                  href="/pets"
+                  className="mb-3 flex min-h-12 items-center justify-center rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  สัตว์เลี้ยงของฉัน
+                </Link>
                 <button
                   type="button"
                   onClick={handleLogout}

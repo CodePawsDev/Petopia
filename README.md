@@ -21,6 +21,9 @@ The first planned business flow is grooming service booking. The project is curr
 - Role-based navigation to manager, groomer and payment workspaces.
 - Workspace APIs enforce session authentication and branch-scoped access.
 - Workspace pages display branch context; business operations are not implemented yet.
+- Owner-scoped pet profiles for dogs, cats and rabbits.
+- Web forms for creating and editing pet profiles with field-level validation.
+- Separate active and archived pet lists, with reversible archival.
 
 ## Stack
 
@@ -264,6 +267,25 @@ Browser checks are currently manual. API authorization checks are automated.
 
 QA documentation: [Requirement traceability](docs/qa/traceability.md).
 
+### Pet profile browser checks
+
+Open `/account` and select “สัตว์เลี้ยงของฉัน”, or visit `/pets` after login.
+
+- Create a pet with a name and species; optional fields may be left blank.
+- Edit a pet and verify that saved changes remain after refreshing.
+- Clear optional fields and verify that they display as unspecified.
+- Check that invalid input displays an error beside the relevant field.
+- Archive a pet through the confirmation dialog.
+- Cancel archival using the cancel button or Escape.
+- Switch between active and archived lists.
+- Restore an archived pet and verify that it returns to the active list.
+- Check the form, cards and dialog at a narrow viewport.
+
+Pet API ownership and validation are covered by automated E2E tests.
+Browser interaction checks are currently manual.
+
+Booking-related archival restrictions are deferred until booking implementation.
+
 ## 8. Automated checks
 
 ```cmd
@@ -308,7 +330,6 @@ Commit migration files. Do not edit migrations that have already been applied an
 
 ## Planned work
 
-- Customer pet profiles.
 - Grooming services, pricing and staff schedules.
 - Availability and booking.
 - Branch operations and payment recording.
