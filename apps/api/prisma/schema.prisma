@@ -42,6 +42,7 @@ model BusinessUnit {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   branches Branch[]
+  services GroomingService[]
 
   @@map("business_units")
 }
@@ -131,4 +132,54 @@ model Pet {
 
   @@index([ownerId, archivedAt])
   @@map("pets")
+}
+
+enum GroomingServiceKind {
+  BATH
+  BATH_WITH_HAIRCUT
+  COAT_SPA
+  EAR_CLEANING
+  NAIL_TRIMMING
+  TOOTH_BRUSHING
+}
+
+model GroomingService {
+  id             String              @id @default(uuid()) @db.Uuid
+  businessUnitId String              @map("business_unit_id") @db.Uuid
+  code           String              @db.VarChar(50)
+  name           String              @db.VarChar(100)
+  description    String?             @db.VarChar(1000)
+  kind           GroomingServiceKind
+  active         Boolean             @default(true)
+  sortOrder      Int                 @default(0) @map("sort_order")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  businessUnit BusinessUnit         @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
+  rates        GroomingServiceRate[]
+
+  @@unique([businessUnitId, code])
+  @@unique([businessUnitId, kind])
+  @@index([businessUnitId, active, sortOrder])
+  @@map("grooming_services")
+}
+
+model GroomingServiceRate {
+  id                 String     @id @default(uuid()) @db.Uuid
+  serviceId          String     @map("service_id") @db.Uuid
+  species            PetSpecies
+  minWeightKg        Decimal    @map("min_weight_kg") @db.Decimal(6, 3)
+  maxWeightKg        Decimal    @map("max_weight_kg") @db.Decimal(6, 3)
+  priceSatang        Int        @map("price_satang")
+  durationMinutes    Int        @map("duration_minutes")
+  requiresAssessment Boolean    @default(false) @map("requires_assessment")
+  active             Boolean    @default(true)
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  service GroomingService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@unique([serviceId, species, minWeightKg, maxWeightKg])
+  @@index([serviceId, species, active])
+  @@map("grooming_service_rates")
 }

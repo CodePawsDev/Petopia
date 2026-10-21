@@ -175,6 +175,36 @@ These cases cover the API. Browser forms and browser interaction tests are track
 
 These booking rules are not implemented or covered by the current pet API tests.
 
+## Service Catalog
+
+Automated tests: [Catalog tests](../../apps/api/test/catalog.e2e-spec.ts).
+
+| Requirement ID  | Acceptance criterion                                                                                                 | Test case IDs                                                  | Coverage    |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ----------- |
+| REQ-CATALOG-001 | List active grooming branches belonging to an active business unit                                                   | TC-CATALOG-001, TC-CATALOG-006, TC-CATALOG-011                 | Implemented |
+| REQ-CATALOG-002 | Return active services and rates with THB currency, numeric weight bounds, prices in satang and durations in minutes | TC-CATALOG-002                                                 | Implemented |
+| REQ-CATALOG-003 | List only active groomers assigned to the selected branch without exposing private account fields                    | TC-CATALOG-003, TC-CATALOG-004, TC-CATALOG-005                 | Implemented |
+| REQ-CATALOG-004 | Reject malformed branch IDs and unavailable branches                                                                 | TC-CATALOG-006, TC-CATALOG-007, TC-CATALOG-008, TC-CATALOG-011 | Implemented |
+| REQ-CATALOG-005 | Hide inactive services and rates, including services without active rates                                            | TC-CATALOG-009, TC-CATALOG-010                                 | Implemented |
+| REQ-CATALOG-006 | Demo rate bands are continuous up to species weight limits; rabbit rates require assessment                          | TC-CATALOG-012                                                 | Implemented |
+
+### Catalog Test Case Index
+
+| Test case ID   | Scenario                                                                        |
+| -------------- | ------------------------------------------------------------------------------- |
+| TC-CATALOG-001 | List active grooming branches                                                   |
+| TC-CATALOG-002 | Return service catalog with numeric rates and THB currency                      |
+| TC-CATALOG-003 | Return branch-specific groomers with public fields only                         |
+| TC-CATALOG-004 | Exclude inactive groomer assignments                                            |
+| TC-CATALOG-005 | Exclude inactive groomer accounts                                               |
+| TC-CATALOG-006 | Hide inactive branches and reject their catalog requests                        |
+| TC-CATALOG-007 | Reject malformed branch IDs                                                     |
+| TC-CATALOG-008 | Reject unknown branch IDs                                                       |
+| TC-CATALOG-009 | Exclude inactive services                                                       |
+| TC-CATALOG-010 | Exclude inactive rates and services without active rates                        |
+| TC-CATALOG-011 | Hide branches and reject catalog requests when the business unit is inactive    |
+| TC-CATALOG-012 | Verify continuous demo weight bands, species limits and rabbit assessment flags |
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.

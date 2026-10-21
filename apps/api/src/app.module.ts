@@ -8,6 +8,7 @@ import { SessionModule } from './session/session.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { BranchWorkspaceModule } from './branch-workspace/branch-workspace.module';
 import { PetsModule } from './pets/pets.module';
+import { CatalogModule } from './catalog/catalog.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { PetsModule } from './pets/pets.module';
     AuthorizationModule,
     BranchWorkspaceModule,
     PetsModule,
+    CatalogModule,
   ],
   controllers: [AppController],
   providers: [AppService],
