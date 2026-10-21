@@ -24,6 +24,9 @@ The first planned business flow is grooming service booking. The project is curr
 - Owner-scoped pet profiles for dogs, cats and rabbits.
 - Web forms for creating and editing pet profiles with field-level validation.
 - Separate active and archived pet lists, with reversible archival.
+- Public catalog APIs for active grooming branches, services, rates and branch groomers.
+- Repeatable demo service catalog with prices in satang and durations in minutes.
+- Species-specific weight bands and assessment flags for rabbit services.
 
 ## Stack
 
@@ -135,6 +138,7 @@ npm run prisma:seed:demo --workspace apps/api
 | manager.ari@demo.petopia.test   | Ari    | BRANCH_MANAGER                   |
 | groomer.ari@demo.petopia.test   | Ari    | GROOMER                          |
 | cashier.onnut@demo.petopia.test | Onnut  | RECEIVE_PAYMENT; no manager role |
+| groomer.onnut@demo.petopia.test | Onnut  | GROOMER                          |
 
 New accounts use the configured `DEMO_PASSWORD`.
 Running the demo seed again does not duplicate records or reset existing
@@ -246,6 +250,7 @@ Log out before switching between demo accounts.
 | Ari manager           | Ari manager and payment workspaces |
 | Ari groomer           | Ari groomer workspace              |
 | Onnut payment account | Onnut payment workspace            |
+| Onnut groomer         | Onnut groomer workspace            |
 
 Authorized workspace pages display the selected branch and placeholder content.
 

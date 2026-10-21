@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client';
+import { seedServiceCatalog } from './seed-service-catalog';
 
 async function main(): Promise<void> {
   const databaseUrl = process.env['DATABASE_URL'];
@@ -23,41 +24,50 @@ async function main(): Promise<void> {
   const prisma = new PrismaClient({ adapter });
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const grooming = await tx.businessUnit.upsert({
-        where: { code: 'GROOMING' },
-        update: {},
-        create: {
-          code: 'GROOMING',
-          name: 'Petopia Grooming',
-        },
-      });
-
-      const branches = [
-        {
-          code: 'GROOMING-ARI',
-          name: 'Petopia Grooming สาขาอารีย์',
-        },
-        {
-          code: 'GROOMING-ONNUT',
-          name: 'Petopia Grooming สาขาอ่อนนุช',
-        },
-      ];
-
-      for (const branch of branches) {
-        await tx.branch.upsert({
-          where: { code: branch.code },
+    await prisma.$transaction(
+      async (tx) => {
+        const grooming = await tx.businessUnit.upsert({
+          where: { code: 'GROOMING' },
           update: {},
           create: {
-            ...branch,
-            businessUnitId: grooming.id,
-            timezone: 'Asia/Bangkok',
+            code: 'GROOMING',
+            name: 'Petopia Grooming',
           },
         });
-      }
-    });
 
-    console.log('Seed completed: Petopia Grooming and two demo branches.');
+        const branches = [
+          {
+            code: 'GROOMING-ARI',
+            name: 'Petopia Grooming สาขาอารีย์',
+          },
+          {
+            code: 'GROOMING-ONNUT',
+            name: 'Petopia Grooming สาขาอ่อนนุช',
+          },
+        ];
+
+        for (const branch of branches) {
+          await tx.branch.upsert({
+            where: { code: branch.code },
+            update: {},
+            create: {
+              ...branch,
+              businessUnitId: grooming.id,
+              timezone: 'Asia/Bangkok',
+            },
+          });
+        }
+
+        await seedServiceCatalog(tx, grooming.id);
+      },
+      {
+        timeout: 30_000,
+      },
+    );
+
+    console.log(
+      'Seed completed: Petopia Grooming, two demo branches and service catalog.',
+    );
   } finally {
     await prisma.$disconnect();
   }

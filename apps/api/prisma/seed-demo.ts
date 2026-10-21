@@ -79,6 +79,16 @@ async function main(): Promise<void> {
         },
       });
 
+      const onnutGroomer = await tx.user.upsert({
+        where: { email: 'groomer.onnut@demo.petopia.test' },
+        update: {},
+        create: {
+          email: 'groomer.onnut@demo.petopia.test',
+          displayName: 'Demo Onnut Groomer',
+          passwordHash,
+        },
+      });
+
       const cashier = await tx.user.upsert({
         where: { email: 'cashier.onnut@demo.petopia.test' },
         update: {},
@@ -121,6 +131,22 @@ async function main(): Promise<void> {
         },
       });
 
+      await tx.staffAssignment.upsert({
+        where: {
+          userId_branchId_role: {
+            userId: onnutGroomer.id,
+            branchId: onnut.id,
+            role: StaffRole.GROOMER,
+          },
+        },
+        update: {},
+        create: {
+          userId: onnutGroomer.id,
+          branchId: onnut.id,
+          role: StaffRole.GROOMER,
+        },
+      });
+
       await tx.permissionGrant.upsert({
         where: {
           userId_branchId_permission: {
@@ -138,7 +164,7 @@ async function main(): Promise<void> {
       });
     });
 
-    console.log('Demo seed completed: four accounts and branch permissions.');
+    console.log('Demo seed completed: five accounts and branch permissions.');
   } finally {
     await prisma.$disconnect();
   }
