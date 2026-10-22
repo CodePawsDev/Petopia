@@ -205,6 +205,43 @@ Automated tests: [Catalog tests](../../apps/api/test/catalog.e2e-spec.ts).
 | TC-CATALOG-011 | Hide branches and reject catalog requests when the business unit is inactive    |
 | TC-CATALOG-012 | Verify continuous demo weight bands, species limits and rabbit assessment flags |
 
+## Service Quotes
+
+Automated tests: [Quote tests](../../apps/api/test/quotes.e2e-spec.ts).
+
+| Requirement ID | Acceptance criterion | Test case IDs | Coverage |
+| --- | --- | --- | --- |
+| REQ-QUOTE-001 | Authenticated users can calculate quotes only for their own non-archived pets | TC-QUOTE-002, TC-QUOTE-005, TC-QUOTE-006 | Implemented |
+| REQ-QUOTE-002 | Calculate item prices, total price in satang and total duration from stored pet data and catalog rates | TC-QUOTE-001, TC-QUOTE-007 | Implemented |
+| REQ-QUOTE-003 | Reject duplicate services and combining bath with bath and haircut | TC-QUOTE-003, TC-QUOTE-004 | Implemented |
+| REQ-QUOTE-004 | Reject missing pet weight and weight outside the selected service's supported range | TC-QUOTE-008, TC-QUOTE-009 | Implemented |
+| REQ-QUOTE-005 | Reject empty service lists, malformed service IDs and client-supplied price or weight fields | TC-QUOTE-010, TC-QUOTE-011 | Implemented |
+| REQ-QUOTE-006 | Return assessment flags for selected rabbit services | TC-QUOTE-012 | Implemented |
+| REQ-QUOTE-007 | Reject the whole quote when a selected service or matching rate is unavailable | TC-QUOTE-013, TC-QUOTE-014, TC-QUOTE-015 | Implemented |
+| REQ-QUOTE-008 | Reject quotes for inactive branches or business units | TC-QUOTE-016, TC-QUOTE-017 | Implemented |
+
+### Quote Test Case Index
+
+| Test case ID | Scenario |
+| --- | --- |
+| TC-QUOTE-001 | Calculate multiple services and verify exact totals and no-store header |
+| TC-QUOTE-002 | Reject requests without a session |
+| TC-QUOTE-003 | Reject duplicate service IDs |
+| TC-QUOTE-004 | Reject bath combined with bath and haircut |
+| TC-QUOTE-005 | Reject access to another customer's pet |
+| TC-QUOTE-006 | Reject an archived pet |
+| TC-QUOTE-007 | Select correct rates at 5, 5.001 and 80 kg |
+| TC-QUOTE-008 | Reject weight above the supported range |
+| TC-QUOTE-009 | Reject a pet without recorded weight |
+| TC-QUOTE-010 | Reject empty service lists and malformed service IDs |
+| TC-QUOTE-011 | Reject client-supplied price and weight |
+| TC-QUOTE-012 | Calculate rabbit services and return assessment flags |
+| TC-QUOTE-013 | Reject an unknown service without returning a partial quote |
+| TC-QUOTE-014 | Reject an inactive service |
+| TC-QUOTE-015 | Reject an inactive matching rate |
+| TC-QUOTE-016 | Reject an inactive branch |
+| TC-QUOTE-017 | Reject an inactive business unit |
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.

@@ -9,6 +9,7 @@ import { AuthorizationModule } from './authorization/authorization.module';
 import { BranchWorkspaceModule } from './branch-workspace/branch-workspace.module';
 import { PetsModule } from './pets/pets.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { QuotesModule } from './quotes/quotes.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { CatalogModule } from './catalog/catalog.module';
     BranchWorkspaceModule,
     PetsModule,
     CatalogModule,
+    QuotesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
