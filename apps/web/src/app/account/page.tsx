@@ -290,26 +290,38 @@ export default function AccountPage() {
               </dl>
 
               <div className="mt-7 border-t border-border pt-6">
-                <Link
-                  href="/pets"
-                  className="mb-3 flex min-h-12 items-center justify-center rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                >
-                  สัตว์เลี้ยงของฉัน
-                </Link>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  disabled={isLoggingOut}
-                  className="min-h-12 w-full rounded-xl border border-primary px-4 py-3 font-semibold text-primary hover:bg-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60"
-                >
-                  {isLoggingOut ? 'กำลังออกจากระบบ…' : 'ออกจากระบบ'}
-                </button>
+                <nav aria-label="เมนูบัญชี" className="space-y-3">
+                  <Link
+                    href="/pets"
+                    className="flex min-h-12 items-center rounded-xl border border-border bg-surface-soft px-4 py-3 text-left font-semibold text-primary transition-colors hover:border-primary hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    สัตว์เลี้ยงของฉัน
+                  </Link>
 
-                {logoutError && (
-                  <p role="alert" className="mt-4 text-sm text-danger">
-                    {logoutError}
-                  </p>
-                )}
+                  <Link
+                    href="/services"
+                    className="flex min-h-12 items-center rounded-xl border border-border bg-surface-soft px-4 py-3 text-left font-semibold text-primary transition-colors hover:border-primary hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    เลือกสาขาและบริการ Grooming
+                  </Link>
+                </nav>
+
+                <div className="mt-5 border-t border-border pt-5">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="min-h-12 w-full rounded-xl px-4 py-3 text-left font-medium text-muted transition-colors hover:bg-surface-soft hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {isLoggingOut ? 'กำลังออกจากระบบ…' : 'ออกจากระบบ'}
+                  </button>
+
+                  {logoutError && (
+                    <p role="alert" className="mt-3 text-sm text-danger">
+                      {logoutError}
+                    </p>
+                  )}
+                </div>
               </div>
             </section>
 

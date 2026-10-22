@@ -27,6 +27,9 @@ The first planned business flow is grooming service booking. The project is curr
 - Public catalog APIs for active grooming branches, services, rates and branch groomers.
 - Repeatable demo service catalog with prices in satang and durations in minutes.
 - Species-specific weight bands and assessment flags for rabbit services.
+- Public grooming catalog page with branch and species selection.
+- Optional weight input to display matching service prices and durations.
+- Branch groomer lists and assessment notices.
 
 ## Stack
 
