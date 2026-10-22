@@ -30,6 +30,8 @@ The first planned business flow is grooming service booking. The project is curr
 - Public grooming catalog page with branch and species selection.
 - Optional weight input to display matching service prices and durations.
 - Branch groomer lists and assessment notices.
+- Authenticated multi-service quote API using stored pet species, weight and catalog rates.
+- Server-side service combination checks, price and duration totals, and assessment flags.
 
 ## Stack
 
@@ -293,6 +295,21 @@ Pet API ownership and validation are covered by automated E2E tests.
 Browser interaction checks are currently manual.
 
 Booking-related archival restrictions are deferred until booking implementation.
+
+### Service quotes
+
+POST /quotes requires an authenticated session.
+
+Send branchId, petId and a non-empty serviceIds array.
+The pet must belong to the authenticated customer and must not be archived.
+
+The API calculates prices and durations from stored pet data and active
+catalog rates. Client-supplied prices and weight are rejected.
+
+Quotes are calculated on demand and are not saved.
+They do not reserve availability, lock prices or create bookings.
+Assessment flags indicate whether staff assessment is required before
+booking confirmation.
 
 ## 8. Automated checks
 
