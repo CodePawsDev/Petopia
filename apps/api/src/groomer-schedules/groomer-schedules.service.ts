@@ -4,7 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, StaffRole } from '../generated/prisma/client';
+import {
+  GroomingBookingStatus,
+  Prisma,
+  StaffRole,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReplaceWeeklyScheduleDto } from './dto/replace-weekly-schedule.dto';
 
@@ -185,6 +189,45 @@ export class GroomerSchedulesService {
       if (hasConflict) {
         throw new ConflictException(
           'Working intervals conflict with another branch schedule',
+        );
+      }
+
+      // Protect upcoming and ongoing confirmed bookings in this branch.
+      const bookings = await tx.groomingBooking.findMany({
+        where: {
+          branchId,
+          groomerId,
+          status: GroomingBookingStatus.CONFIRMED,
+          occupiedEndsAt: { gt: new Date() },
+        },
+        select: {
+          startsAt: true,
+          occupiedEndsAt: true,
+        },
+      });
+
+      const offsetMs = 7 * 60 * 60 * 1000;
+      const minuteMs = 60_000;
+
+      const invalidatesBooking = bookings.some((booking) => {
+        const localStart = new Date(booking.startsAt.getTime() + offsetMs);
+        const weekday = localStart.getUTCDay() || 7;
+        const localDate = localStart.toISOString().slice(0, 10);
+        const dayStartMs = new Date(`${localDate}T00:00:00+07:00`).getTime();
+
+        return !intervals.some(
+          (interval) =>
+            interval.weekday === weekday &&
+            dayStartMs + interval.startMinute * minuteMs <=
+              booking.startsAt.getTime() &&
+            booking.occupiedEndsAt.getTime() <=
+              dayStartMs + interval.endMinute * minuteMs,
+        );
+      });
+
+      if (invalidatesBooking) {
+        throw new ConflictException(
+          'Working intervals must preserve existing confirmed bookings including their buffer',
         );
       }
 

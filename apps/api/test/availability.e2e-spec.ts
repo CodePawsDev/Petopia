@@ -12,6 +12,9 @@ import {
 } from '../src/generated/prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { setupApp } from '../src/setup-app';
+import { ConflictException } from '@nestjs/common';
+import { GroomerSchedulesService } from '../src/groomer-schedules/groomer-schedules.service';
+import { GroomerTimeOffsService } from '../src/groomer-schedules/groomer-time-offs.service';
 
 type Slot = {
   startsAt: string;
@@ -96,6 +99,31 @@ describe('Availability (e2e)', () => {
 
   function localTime(time: string, targetDate = date): string {
     return new Date(`${targetDate}T${time}:00+07:00`).toISOString();
+  }
+  function bookingPayload() {
+    return {
+      branchId,
+      petId,
+      groomerId,
+      serviceIds: [bathId, nailId],
+      startsAt: localTime('09:00'),
+    };
+  }
+
+  async function expectNoBookings() {
+    expect(
+      await prisma.groomingBooking.count({
+        where: { groomerId },
+      }),
+    ).toBe(0);
+
+    expect(
+      await prisma.groomingBookingItem.count({
+        where: {
+          booking: { groomerId },
+        },
+      }),
+    ).toBe(0);
   }
 
   function payload() {
@@ -263,6 +291,19 @@ describe('Availability (e2e)', () => {
 
   beforeEach(async () => {
     await prisma.$transaction(async (tx) => {
+      await tx.groomingBookingItem.deleteMany({
+        where: {
+          booking: {
+            groomerId,
+          },
+        },
+      });
+
+      await tx.groomingBooking.deleteMany({
+        where: {
+          groomerId,
+        },
+      });
       await tx.groomerWorkingInterval.deleteMany({
         where: { groomerId },
       });
@@ -315,6 +356,19 @@ describe('Availability (e2e)', () => {
     try {
       if (prisma) {
         await prisma.$transaction(async (tx) => {
+          await tx.groomingBookingItem.deleteMany({
+            where: {
+              booking: {
+                groomerId,
+              },
+            },
+          });
+
+          await tx.groomingBooking.deleteMany({
+            where: {
+              groomerId,
+            },
+          });
           await tx.groomerWorkingInterval.deleteMany({
             where: { groomerId },
           });
@@ -609,5 +663,356 @@ describe('Availability (e2e)', () => {
       reason: 'NO_AVAILABLE_SLOTS',
     });
     expect(starts(response.body)).toEqual([]);
+  });
+  it('[TC-BOOK-001] creates one booking and removes its occupied interval from availability', async () => {
+    const response = await customer
+      .post('/bookings')
+      .send({
+        branchId,
+        petId,
+        groomerId,
+        serviceIds: [bathId, nailId],
+        startsAt: localTime('09:00'),
+      })
+      .expect(201)
+      .expect('Cache-Control', 'no-store');
+
+    expect(response.body as unknown).toMatchObject({
+      status: 'CONFIRMED',
+      branchId,
+      petId,
+      groomerId,
+      totalPriceSatang: 40000,
+      totalDurationMinutes: 55,
+      bufferMinutes: 15,
+      startsAt: localTime('09:00'),
+      serviceEndsAt: localTime('09:55'),
+      occupiedEndsAt: localTime('10:10'),
+    });
+
+    const stored = await prisma.groomingBooking.findMany({
+      where: { groomerId },
+      include: {
+        items: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    expect(stored).toHaveLength(1);
+    expect(stored[0].items).toHaveLength(2);
+    expect(
+      stored[0].items.reduce((total, item) => total + item.priceSatang, 0),
+    ).toBe(stored[0].totalPriceSatang);
+    expect(
+      stored[0].items.reduce((total, item) => total + item.durationMinutes, 0),
+    ).toBe(stored[0].totalDurationMinutes);
+
+    const available = await customer
+      .post('/availability/search')
+      .send(payload())
+      .expect(200);
+
+    const availableStarts = starts(available.body);
+
+    expect(availableStarts).not.toContain(localTime('09:00'));
+    expect(availableStarts).not.toContain(localTime('10:00'));
+    expect(availableStarts).toContain(localTime('10:15'));
+  });
+
+  it('[TC-BOOK-002] persists only one of two competing booking requests', async () => {
+    const body = {
+      branchId,
+      petId,
+      groomerId,
+      serviceIds: [bathId, nailId],
+      startsAt: localTime('09:00'),
+    };
+
+    const responses = await Promise.all([
+      customer.post('/bookings').send(body),
+      customer.post('/bookings').send(body),
+    ]);
+
+    expect(
+      responses.map((response) => response.status).sort((a, b) => a - b),
+    ).toEqual([201, 409]);
+
+    const bookings = await prisma.groomingBooking.findMany({
+      where: { groomerId },
+      include: { items: true },
+    });
+
+    expect(bookings).toHaveLength(1);
+    expect(bookings[0].items).toHaveLength(2);
+  });
+  it('[TC-BOOK-003] rejects booking without a session', async () => {
+    await request(app.getHttpServer())
+      .post('/bookings')
+      .send(bookingPayload())
+      .expect(401);
+
+    await expectNoBookings();
+  });
+
+  it('[TC-BOOK-004] rejects booking another customer pet', async () => {
+    await customer
+      .post('/bookings')
+      .send({ ...bookingPayload(), petId: otherPetId })
+      .expect(404);
+
+    await expectNoBookings();
+  });
+
+  it('[TC-BOOK-005] rejects assessment-required booking', async () => {
+    await customer
+      .post('/bookings')
+      .send({ ...bookingPayload(), petId: rabbitId })
+      .expect(400);
+
+    await expectNoBookings();
+  });
+
+  it.each([
+    {
+      name: 'a start outside a 15-minute boundary',
+      time: '09:01',
+      expectedStatus: 400,
+    },
+    {
+      name: 'a start during the lunch break',
+      time: '12:00',
+      expectedStatus: 409,
+    },
+    {
+      name: 'a start whose buffer crosses closing time',
+      time: '17:00',
+      expectedStatus: 409,
+    },
+  ])('[TC-BOOK-006] rejects $name', async ({ time, expectedStatus }) => {
+    await customer
+      .post('/bookings')
+      .send({
+        ...bookingPayload(),
+        startsAt: localTime(time),
+      })
+      .expect(expectedStatus);
+
+    await expectNoBookings();
+  });
+
+  it('[TC-BOOK-007] rejects booking when a required skill is inactive', async () => {
+    await prisma.groomerServiceSkill.updateMany({
+      where: {
+        groomerId,
+        serviceId: nailId,
+        species: PetSpecies.DOG,
+      },
+      data: { active: false },
+    });
+
+    await customer.post('/bookings').send(bookingPayload()).expect(409);
+
+    await expectNoBookings();
+  });
+
+  it('[TC-BOOK-008] preserves the weekly schedule and version when a change cuts off a booking buffer', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const before = await prisma.groomerWorkingInterval.findMany({
+      where: { branchId, groomerId },
+      orderBy: { id: 'asc' },
+    });
+
+    const branchBefore = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    const schedules = app.get(GroomerSchedulesService);
+
+    await expect(
+      schedules.replaceWeeklySchedule(branchId, groomerId, {
+        intervals: [
+          {
+            weekday,
+            startMinute: 540,
+            endMinute: 595,
+          },
+          {
+            weekday,
+            startMinute: 780,
+            endMinute: 1080,
+          },
+        ],
+      }),
+    ).rejects.toThrow(ConflictException);
+
+    expect(
+      await prisma.groomerWorkingInterval.findMany({
+        where: { branchId, groomerId },
+        orderBy: { id: 'asc' },
+      }),
+    ).toEqual(before);
+
+    expect(
+      await prisma.branch.findUniqueOrThrow({
+        where: { id: branchId },
+        select: { scheduleVersion: true },
+      }),
+    ).toEqual(branchBefore);
+  });
+
+  it('[TC-BOOK-009] rejects cross-branch time off overlapping only the booking buffer', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const branchBefore = await prisma.branch.findUniqueOrThrow({
+      where: { id: otherBranchId },
+      select: { scheduleVersion: true },
+    });
+
+    const timeOffs = app.get(GroomerTimeOffsService);
+
+    await expect(
+      timeOffs.create(otherBranchId, groomerId, {
+        startsAt: localTime('10:00'),
+        endsAt: localTime('10:05'),
+        reason: 'Buffer conflict test',
+      }),
+    ).rejects.toThrow(ConflictException);
+
+    expect(
+      await prisma.groomerTimeOff.count({
+        where: { groomerId },
+      }),
+    ).toBe(0);
+
+    expect(
+      await prisma.branch.findUniqueOrThrow({
+        where: { id: otherBranchId },
+        select: { scheduleVersion: true },
+      }),
+    ).toEqual(branchBefore);
+  });
+  it('[TC-BOOK-010] allows a schedule change that preserves the full booking and buffer', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const branchBefore = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    const intervals = [
+      {
+        weekday,
+        startMinute: 540,
+        endMinute: 610,
+      },
+      {
+        weekday,
+        startMinute: 780,
+        endMinute: 1080,
+      },
+    ];
+
+    const schedules = app.get(GroomerSchedulesService);
+
+    await schedules.replaceWeeklySchedule(branchId, groomerId, {
+      intervals,
+    });
+
+    expect(
+      await prisma.groomerWorkingInterval.findMany({
+        where: { branchId, groomerId },
+        orderBy: { startMinute: 'asc' },
+        select: {
+          weekday: true,
+          startMinute: true,
+          endMinute: true,
+        },
+      }),
+    ).toEqual(intervals);
+
+    const branchAfter = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    expect(branchAfter.scheduleVersion).toBe(branchBefore.scheduleVersion + 1);
+
+    expect(
+      await prisma.groomingBooking.count({
+        where: { groomerId, status: 'CONFIRMED' },
+      }),
+    ).toBe(1);
+  });
+
+  it('[TC-BOOK-011] allows time off starting exactly at the occupied end', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const timeOffs = app.get(GroomerTimeOffsService);
+
+    const created = await timeOffs.create(branchId, groomerId, {
+      startsAt: localTime('10:10'),
+      endsAt: localTime('10:30'),
+      reason: 'Adjacent time off',
+    });
+
+    expect(created.startsAt.toISOString()).toBe(localTime('10:10'));
+
+    expect(
+      await prisma.groomerTimeOff.count({
+        where: { groomerId },
+      }),
+    ).toBe(1);
+
+    expect(
+      await prisma.groomingBooking.count({
+        where: { groomerId, status: 'CONFIRMED' },
+      }),
+    ).toBe(1);
+  });
+
+  it('[TC-BOOK-012] blocks availability using an existing booking from another branch', async () => {
+    // Prepare a valid booking at the other branch first.
+    await prisma.groomerWorkingInterval.updateMany({
+      where: { groomerId, branchId },
+      data: { branchId: otherBranchId },
+    });
+
+    await customer
+      .post('/bookings')
+      .send({
+        ...bookingPayload(),
+        branchId: otherBranchId,
+      })
+      .expect(201);
+
+    // Model a later weekly schedule at this branch.
+    // Direct fixture writes bypass schedule-change protection intentionally.
+    await prisma.groomerWorkingInterval.updateMany({
+      where: { groomerId, branchId: otherBranchId },
+      data: { branchId },
+    });
+
+    const available = await customer
+      .post('/availability/search')
+      .send(payload())
+      .expect(200);
+
+    const availableStarts = starts(available.body);
+
+    expect(availableStarts).not.toContain(localTime('09:00'));
+    expect(availableStarts).not.toContain(localTime('10:00'));
+    expect(availableStarts).toContain(localTime('10:15'));
+
+    await customer.post('/bookings').send(bookingPayload()).expect(409);
+
+    const bookings = await prisma.groomingBooking.findMany({
+      where: { groomerId },
+      select: { branchId: true },
+    });
+
+    expect(bookings).toEqual([{ branchId: otherBranchId }]);
   });
 });
