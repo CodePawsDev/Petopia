@@ -321,8 +321,39 @@ Validation reported by the developer on 2026-10-23:
 The totals cover the whole API, not availability alone.
 Availability E2E coverage contains 18 tests.
 
-Existing booking conflicts and atomic booking creation are
-outside the current implementation.
+Booking integration is covered by the following additional cases.
+
+## Grooming booking creation
+
+| Test ID     | Coverage                                                                             | Evidence                 |
+| ----------- | ------------------------------------------------------------------------------------ | ------------------------ |
+| TC-BOOK-001 | Creates booking and items; removes occupied slots from availability                  | availability.e2e-spec.ts |
+| TC-BOOK-002 | Two competing requests produce one 201 and one 409, with one stored booking          | availability.e2e-spec.ts |
+| TC-BOOK-003 | Rejects unauthenticated booking                                                      | availability.e2e-spec.ts |
+| TC-BOOK-004 | Rejects another customer's pet                                                       | availability.e2e-spec.ts |
+| TC-BOOK-005 | Rejects assessment-required booking                                                  | availability.e2e-spec.ts |
+| TC-BOOK-006 | Rejects invalid start boundaries, lunch-break starts and closing-time buffer overlap | availability.e2e-spec.ts |
+| TC-BOOK-007 | Rejects inactive required service skill                                              | availability.e2e-spec.ts |
+| TC-BOOK-008 | Rejects schedule changes cutting off booking buffer; preserves schedule and version  | availability.e2e-spec.ts |
+| TC-BOOK-009 | Rejects cross-branch time off overlapping booking buffer; preserves data and version | availability.e2e-spec.ts |
+| TC-BOOK-010 | Allows schedule changes preserving the complete occupied interval                    | availability.e2e-spec.ts |
+| TC-BOOK-011 | Allows time off starting exactly at the occupied end                                 | availability.e2e-spec.ts |
+| TC-BOOK-012 | Existing bookings block availability and booking creation across branches            | availability.e2e-spec.ts |
+
+TC-BOOK-008 through TC-BOOK-011 invoke real services and the test database
+within the E2E suite; they do not exercise HTTP authorization.
+
+Validation reported by the developer on 2026-10-23:
+
+- API and web lint passed.
+- API unit tests: 12 passed across 2 suites.
+- API E2E tests: 154 passed across 9 suites.
+- API and web production builds passed.
+- Manual checks passed for booking creation, duplicate rejection,
+  occupied-slot removal, time-off conflicts and weekly schedule conflicts.
+
+The availability E2E file now contains 32 tests:
+18 availability tests and 14 booking integration tests.
 
 ## Maintenance
 

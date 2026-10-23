@@ -1,9 +1,14 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, StaffRole } from '../generated/prisma/client';
+import {
+  GroomingBookingStatus,
+  Prisma,
+  StaffRole,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTimeOffDto } from './dto/create-time-off.dto';
 
@@ -59,11 +64,11 @@ export class GroomerTimeOffsService {
   ): Promise<void> {
     const groomers = await tx.$queryRaw<Array<{ id: string }>>(
       Prisma.sql`
-          SELECT "id"
-          FROM "users"
-          WHERE "id" = ${groomerId}::uuid
-          FOR UPDATE
-        `,
+        SELECT "id"
+        FROM "users"
+        WHERE "id" = ${groomerId}::uuid
+        FOR UPDATE
+      `,
     );
 
     if (groomers.length === 0) {
@@ -101,6 +106,27 @@ export class GroomerTimeOffsService {
     return this.prismaService.$transaction(async (tx) => {
       await this.lockGroomer(tx, groomerId);
       await this.requireGroomer(tx, branchId, groomerId);
+
+      // Time off affects this groomer across all branches.
+      const conflictingBooking = await tx.groomingBooking.findFirst({
+        where: {
+          groomerId,
+          status: GroomingBookingStatus.CONFIRMED,
+          startsAt: { lt: endsAt },
+          occupiedEndsAt: {
+            gt: new Date(Math.max(startsAt.getTime(), Date.now())),
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (conflictingBooking) {
+        throw new ConflictException(
+          'Time off conflicts with an existing confirmed booking including its buffer',
+        );
+      }
 
       const timeOff = await tx.groomerTimeOff.create({
         data: {

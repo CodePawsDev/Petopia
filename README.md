@@ -382,9 +382,31 @@ Availability uses:
 Services requiring assessment return `ASSESSMENT_REQUIRED`
 without available slots.
 
-Current limitation: existing bookings are not deducted yet.
-Booking creation and atomic conflict prevention will be added
-with the booking workflow.
+Existing confirmed, completed and no-show bookings block the groomer's
+occupied interval across branches. Cancelled bookings do not block slots.
+
+## Grooming booking creation API
+
+Authenticated customers can create a booking with `POST /bookings`,
+providing `branchId`, `petId`, `groomerId`, `serviceIds` and `startsAt`
+(an ISO timestamp with a timezone).
+
+The API rechecks availability inside the booking transaction and stores
+pet details, service prices and durations as booking-time snapshots.
+Successful bookings return 201 with status CONFIRMED.
+Unavailable slots return 409.
+
+Booking creation serializes requests for the same groomer.
+A database exclusion constraint also prevents overlapping occupied
+intervals across branches.
+
+Weekly schedule changes and time-off creation reject conflicts with
+upcoming or ongoing confirmed bookings, including their buffer.
+
+Assessment-required services cannot be booked through this endpoint yet.
+
+Remaining work includes booking read/cancellation APIs, payment recording,
+booking UI and the assessment workflow.
 
 ## Planned work
 

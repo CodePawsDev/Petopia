@@ -12,6 +12,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { GroomerSchedulesModule } from './groomer-schedules/groomer-schedules.module';
 import { AvailabilityModule } from './availability/availability.module';
+import { BookingsModule } from './bookings/bookings.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { AvailabilityModule } from './availability/availability.module';
     QuotesModule,
     GroomerSchedulesModule,
     AvailabilityModule,
+    BookingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

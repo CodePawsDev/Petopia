@@ -3,7 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, StaffRole } from '../generated/prisma/client';
+import {
+  GroomingBookingStatus,
+  Prisma,
+  StaffRole,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuotesService } from '../quotes/quotes.service';
 import {
@@ -32,6 +36,19 @@ export class AvailabilityService {
   ) {}
 
   async search(ownerId: string, dto: SearchAvailabilityDto) {
+    return this.prismaService.$transaction(
+      (tx) => this.searchInTransaction(tx, ownerId, dto),
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+      },
+    );
+  }
+
+  async searchInTransaction(
+    tx: Prisma.TransactionClient,
+    ownerId: string,
+    dto: SearchAvailabilityDto,
+  ) {
     const now = new Date();
     const dayStart = new Date(`${dto.date}T00:00:00+07:00`);
 
@@ -51,174 +68,188 @@ export class AvailabilityService {
     ).getUTCDay();
     const weekday = localDay === 0 ? 7 : localDay;
 
-    return this.prismaService.$transaction(
-      async (tx) => {
-        const quote = await this.quotesService.calculateInTransaction(
-          tx,
-          ownerId,
-          dto,
-        );
+    const quote = await this.quotesService.calculateInTransaction(
+      tx,
+      ownerId,
+      dto,
+    );
 
-        const branch = await tx.branch.findUniqueOrThrow({
-          where: { id: dto.branchId },
-          select: { timezone: true },
-        });
+    const branch = await tx.branch.findUniqueOrThrow({
+      where: { id: dto.branchId },
+      select: { timezone: true },
+    });
 
-        if (branch.timezone !== 'Asia/Bangkok') {
-          throw new BadRequestException(
-            'Availability currently supports Asia/Bangkok only',
-          );
-        }
+    if (branch.timezone !== 'Asia/Bangkok') {
+      throw new BadRequestException(
+        'Availability currently supports Asia/Bangkok only',
+      );
+    }
 
-        const candidates = await tx.user.findMany({
+    const candidates = await tx.user.findMany({
+      where: {
+        active: true,
+        ...(dto.groomerId ? { id: dto.groomerId } : {}),
+        staffAssignments: {
+          some: {
+            branchId: dto.branchId,
+            role: StaffRole.GROOMER,
+            active: true,
+          },
+        },
+      },
+      select: {
+        id: true,
+        displayName: true,
+        groomerServiceSkills: {
           where: {
             active: true,
-            ...(dto.groomerId ? { id: dto.groomerId } : {}),
-            staffAssignments: {
-              some: {
-                branchId: dto.branchId,
-                role: StaffRole.GROOMER,
-                active: true,
-              },
-            },
+            species: quote.pet.species,
+            serviceId: { in: dto.serviceIds },
           },
-          select: {
-            id: true,
-            displayName: true,
-            groomerServiceSkills: {
-              where: {
-                active: true,
-                species: quote.pet.species,
-                serviceId: { in: dto.serviceIds },
-              },
-              select: { serviceId: true },
-            },
-          },
-          orderBy: [{ displayName: 'asc' }, { id: 'asc' }],
-        });
-
-        if (dto.groomerId && candidates.length === 0) {
-          throw new NotFoundException('Active branch groomer not found');
-        }
-
-        const eligibleGroomers = candidates.filter((groomer) => {
-          const skills = new Set(
-            groomer.groomerServiceSkills.map((skill) => skill.serviceId),
-          );
-
-          return dto.serviceIds.every((serviceId) => skills.has(serviceId));
-        });
-
-        const baseResponse = {
-          date: dto.date,
-          timezone: branch.timezone,
-          evaluatedAt: now,
-          slotIntervalMinutes: SLOT_INTERVAL_MINUTES,
-          bufferMinutes: BUFFER_MINUTES,
-          quote,
-        };
-
-        if (quote.requiresAssessment) {
-          return {
-            ...baseResponse,
-            reason: 'ASSESSMENT_REQUIRED',
-            groomers: [] as GroomerAvailability[],
-          };
-        }
-
-        if (eligibleGroomers.length === 0) {
-          return {
-            ...baseResponse,
-            reason: 'NO_ELIGIBLE_GROOMERS',
-            groomers: [] as GroomerAvailability[],
-          };
-        }
-
-        const groomerIds = eligibleGroomers.map((groomer) => groomer.id);
-
-        const workingIntervals = await tx.groomerWorkingInterval.findMany({
-          where: {
-            branchId: dto.branchId,
-            groomerId: { in: groomerIds },
-            weekday,
-          },
-          select: {
-            groomerId: true,
-            startMinute: true,
-            endMinute: true,
-          },
-        });
-
-        // No branch filter: a groomer's time off applies across branches.
-        const timeOffs = await tx.groomerTimeOff.findMany({
-          where: {
-            groomerId: { in: groomerIds },
-            startsAt: { lt: dayEnd },
-            endsAt: { gt: dayStart },
-          },
-          select: {
-            groomerId: true,
-            startsAt: true,
-            endsAt: true,
-          },
-        });
-
-        const closures = await tx.branchClosure.findMany({
-          where: {
-            branchId: dto.branchId,
-            startsAt: { lt: dayEnd },
-            endsAt: { gt: dayStart },
-          },
-          select: {
-            startsAt: true,
-            endsAt: true,
-          },
-        });
-
-        const groomers: GroomerAvailability[] = eligibleGroomers.map(
-          (groomer) => {
-            const working = workingIntervals
-              .filter((interval) => interval.groomerId === groomer.id)
-              .map((interval) => ({
-                startsAt: new Date(
-                  dayStart.getTime() + interval.startMinute * MINUTE_MS,
-                ),
-                endsAt: new Date(
-                  dayStart.getTime() + interval.endMinute * MINUTE_MS,
-                ),
-              }));
-
-            const blocked = [
-              ...closures,
-              ...timeOffs.filter((timeOff) => timeOff.groomerId === groomer.id),
-            ];
-
-            const slots = calculateAvailableSlots({
-              now,
-              serviceDurationMinutes: quote.totalDurationMinutes,
-              workingIntervals: working,
-              blockedIntervals: blocked,
-            });
-
-            return {
-              id: groomer.id,
-              displayName: groomer.displayName,
-              slots,
-            };
-          },
-        );
-
-        return {
-          ...baseResponse,
-          reason: groomers.some((groomer) => groomer.slots.length > 0)
-            ? 'AVAILABLE'
-            : 'NO_AVAILABLE_SLOTS',
-          groomers,
-        };
+          select: { serviceId: true },
+        },
       },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+      orderBy: [{ displayName: 'asc' }, { id: 'asc' }],
+    });
+
+    if (dto.groomerId && candidates.length === 0) {
+      throw new NotFoundException('Active branch groomer not found');
+    }
+
+    const eligibleGroomers = candidates.filter((groomer) => {
+      const skills = new Set(
+        groomer.groomerServiceSkills.map((skill) => skill.serviceId),
+      );
+
+      return dto.serviceIds.every((serviceId) => skills.has(serviceId));
+    });
+
+    const baseResponse = {
+      date: dto.date,
+      timezone: branch.timezone,
+      evaluatedAt: now,
+      slotIntervalMinutes: SLOT_INTERVAL_MINUTES,
+      bufferMinutes: BUFFER_MINUTES,
+      quote,
+    };
+
+    if (quote.requiresAssessment) {
+      return {
+        ...baseResponse,
+        reason: 'ASSESSMENT_REQUIRED',
+        groomers: [] as GroomerAvailability[],
+      };
+    }
+
+    if (eligibleGroomers.length === 0) {
+      return {
+        ...baseResponse,
+        reason: 'NO_ELIGIBLE_GROOMERS',
+        groomers: [] as GroomerAvailability[],
+      };
+    }
+
+    const groomerIds = eligibleGroomers.map((groomer) => groomer.id);
+
+    const workingIntervals = await tx.groomerWorkingInterval.findMany({
+      where: {
+        branchId: dto.branchId,
+        groomerId: { in: groomerIds },
+        weekday,
       },
-    );
+      select: {
+        groomerId: true,
+        startMinute: true,
+        endMinute: true,
+      },
+    });
+
+    // Time off applies to the groomer across all branches.
+    const timeOffs = await tx.groomerTimeOff.findMany({
+      where: {
+        groomerId: { in: groomerIds },
+        startsAt: { lt: dayEnd },
+        endsAt: { gt: dayStart },
+      },
+      select: {
+        groomerId: true,
+        startsAt: true,
+        endsAt: true,
+      },
+    });
+
+    const closures = await tx.branchClosure.findMany({
+      where: {
+        branchId: dto.branchId,
+        startsAt: { lt: dayEnd },
+        endsAt: { gt: dayStart },
+      },
+      select: {
+        startsAt: true,
+        endsAt: true,
+      },
+    });
+
+    // Existing occupied intervals block the groomer across branches.
+    const bookings = await tx.groomingBooking.findMany({
+      where: {
+        groomerId: { in: groomerIds },
+        status: {
+          in: [
+            GroomingBookingStatus.CONFIRMED,
+            GroomingBookingStatus.COMPLETED,
+            GroomingBookingStatus.NO_SHOW,
+          ],
+        },
+        startsAt: { lt: dayEnd },
+        occupiedEndsAt: { gt: dayStart },
+      },
+      select: {
+        groomerId: true,
+        startsAt: true,
+        occupiedEndsAt: true,
+      },
+    });
+
+    const groomers: GroomerAvailability[] = eligibleGroomers.map((groomer) => {
+      const working = workingIntervals
+        .filter((interval) => interval.groomerId === groomer.id)
+        .map((interval) => ({
+          startsAt: new Date(
+            dayStart.getTime() + interval.startMinute * MINUTE_MS,
+          ),
+          endsAt: new Date(dayStart.getTime() + interval.endMinute * MINUTE_MS),
+        }));
+
+      const blocked = [
+        ...closures,
+        ...timeOffs.filter((timeOff) => timeOff.groomerId === groomer.id),
+        ...bookings
+          .filter((booking) => booking.groomerId === groomer.id)
+          .map((booking) => ({
+            startsAt: booking.startsAt,
+            endsAt: booking.occupiedEndsAt,
+          })),
+      ];
+
+      return {
+        id: groomer.id,
+        displayName: groomer.displayName,
+        slots: calculateAvailableSlots({
+          now,
+          serviceDurationMinutes: quote.totalDurationMinutes,
+          workingIntervals: working,
+          blockedIntervals: blocked,
+        }),
+      };
+    });
+
+    return {
+      ...baseResponse,
+      reason: groomers.some((groomer) => groomer.slots.length > 0)
+        ? 'AVAILABLE'
+        : 'NO_AVAILABLE_SLOTS',
+      groomers,
+    };
   }
 }

@@ -9,20 +9,22 @@ datasource db {
 }
 
 model User {
-  id                      String                   @id @default(uuid()) @db.Uuid
-  email                   String                   @unique @db.VarChar(254)
-  passwordHash            String                   @map("password_hash")
-  displayName             String                   @map("display_name") @db.VarChar(100)
-  active                  Boolean                  @default(true)
-  authVersion             Int                      @default(1) @map("auth_version")
-  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
-  staffAssignments        StaffAssignment[]
-  permissionGrants        PermissionGrant[]
-  pets                    Pet[]
-  groomerWorkingIntervals GroomerWorkingInterval[]
-  groomerTimeOffs         GroomerTimeOff[]
-  groomerServiceSkills    GroomerServiceSkill[]
+  id                       String                   @id @default(uuid()) @db.Uuid
+  email                    String                   @unique @db.VarChar(254)
+  passwordHash             String                   @map("password_hash")
+  displayName              String                   @map("display_name") @db.VarChar(100)
+  active                   Boolean                  @default(true)
+  authVersion              Int                      @default(1) @map("auth_version")
+  createdAt                DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  staffAssignments         StaffAssignment[]
+  permissionGrants         PermissionGrant[]
+  pets                     Pet[]
+  groomerWorkingIntervals  GroomerWorkingInterval[]
+  groomerTimeOffs          GroomerTimeOff[]
+  groomerServiceSkills     GroomerServiceSkill[]
+  ownedGroomingBookings    GroomingBooking[]        @relation("GroomingBookingOwner")
+  assignedGroomingBookings GroomingBooking[]        @relation("GroomingBookingGroomer")
 
   @@map("users")
 }
@@ -65,8 +67,9 @@ model Branch {
   groomerWorkingIntervals GroomerWorkingInterval[]
   closures                BranchClosure[]
 
-  businessUnit    BusinessUnit     @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
-  groomerTimeOffs GroomerTimeOff[]
+  businessUnit     BusinessUnit      @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
+  groomerTimeOffs  GroomerTimeOff[]
+  groomingBookings GroomingBooking[]
 
   @@index([businessUnitId])
   @@map("branches")
@@ -134,7 +137,8 @@ model Pet {
   createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  groomingBookings GroomingBooking[]
 
   @@index([ownerId, archivedAt])
   @@map("pets")
@@ -164,6 +168,7 @@ model GroomingService {
   businessUnit  BusinessUnit          @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
   rates         GroomingServiceRate[]
   groomerSkills GroomerServiceSkill[]
+  bookingItems  GroomingBookingItem[]
 
   @@unique([businessUnitId, code])
   @@unique([businessUnitId, kind])
@@ -184,7 +189,8 @@ model GroomingServiceRate {
   createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  service GroomingService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  service      GroomingService       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  bookingItems GroomingBookingItem[]
 
   @@unique([serviceId, species, minWeightKg, maxWeightKg])
   @@index([serviceId, species, active])
@@ -257,4 +263,68 @@ model BranchClosure {
 
   @@index([branchId, startsAt, endsAt])
   @@map("branch_closures")
+}
+
+enum GroomingBookingStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model GroomingBooking {
+  id                   String                @id @default(uuid()) @db.Uuid
+  ownerId              String                @map("owner_id") @db.Uuid
+  petId                String                @map("pet_id") @db.Uuid
+  branchId             String                @map("branch_id") @db.Uuid
+  groomerId            String                @map("groomer_id") @db.Uuid
+  status               GroomingBookingStatus @default(CONFIRMED)
+  startsAt             DateTime              @map("starts_at") @db.Timestamptz(3)
+  serviceEndsAt        DateTime              @map("service_ends_at") @db.Timestamptz(3)
+  occupiedEndsAt       DateTime              @map("occupied_ends_at") @db.Timestamptz(3)
+  timezone             String                @db.VarChar(100)
+  petName              String                @map("pet_name") @db.VarChar(100)
+  petSpecies           PetSpecies            @map("pet_species")
+  petWeightKg          Decimal               @map("pet_weight_kg") @db.Decimal(6, 3)
+  currency             String                @default("THB") @db.VarChar(3)
+  totalPriceSatang     Int                   @map("total_price_satang")
+  totalDurationMinutes Int                   @map("total_duration_minutes")
+  bufferMinutes        Int                   @map("buffer_minutes")
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  owner   User                  @relation("GroomingBookingOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  groomer User                  @relation("GroomingBookingGroomer", fields: [groomerId], references: [id], onDelete: Restrict)
+  pet     Pet                   @relation(fields: [petId], references: [id], onDelete: Restrict)
+  branch  Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  items   GroomingBookingItem[]
+
+  @@index([ownerId, startsAt])
+  @@index([petId, startsAt])
+  @@index([branchId, startsAt])
+  @@index([groomerId, startsAt, occupiedEndsAt])
+  @@map("grooming_bookings")
+}
+
+model GroomingBookingItem {
+  id              String              @id @default(uuid()) @db.Uuid
+  bookingId       String              @map("booking_id") @db.Uuid
+  serviceId       String              @map("service_id") @db.Uuid
+  rateId          String              @map("rate_id") @db.Uuid
+  code            String              @db.VarChar(50)
+  name            String              @db.VarChar(100)
+  kind            GroomingServiceKind
+  priceSatang     Int                 @map("price_satang")
+  durationMinutes Int                 @map("duration_minutes")
+  sortOrder       Int                 @map("sort_order")
+
+  booking GroomingBooking     @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  service GroomingService     @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  rate    GroomingServiceRate @relation(fields: [rateId], references: [id], onDelete: Restrict)
+
+  @@unique([bookingId, serviceId])
+  @@unique([bookingId, sortOrder])
+  @@index([serviceId])
+  @@index([rateId])
+  @@map("grooming_booking_items")
 }
