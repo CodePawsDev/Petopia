@@ -385,6 +385,21 @@ without available slots.
 Existing confirmed, completed and no-show bookings block the groomer's
 occupied interval across branches. Cancelled bookings do not block slots.
 
+## Booking cancellation API
+
+Authenticated owners can cancel a booking using
+POST /bookings/:bookingId/cancel without a request body.
+
+- Only CONFIRMED bookings can transition to CANCELLED.
+- Cancellation must occur before the appointment starts.
+- Cancelled bookings release their occupied interval.
+- Booking details and service items remain available as history.
+- Repeated cancellation returns 200 without updating the record again.
+- Another owner's booking returns 404.
+- Cancellation uses the same groomer lock as booking creation.
+
+Cancellation does not record or reverse payments.
+
 ## My bookings API
 
 Authenticated customers can read their own bookings:
@@ -423,7 +438,7 @@ upcoming or ongoing confirmed bookings, including their buffer.
 
 Assessment-required services cannot be booked through this endpoint yet.
 
-Remaining work includes booking cancellation API, payment recording,
+Remaining work includes payment recording,
 booking UI and the assessment workflow.
 
 ## Planned work
