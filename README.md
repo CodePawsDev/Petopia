@@ -35,6 +35,9 @@ The first planned business flow is grooming service booking. The project is curr
 - Multi-service selection and server-calculated quotes for an authenticated customer's pet.
 - Service prices displayed using stored pet species and weight.
 - Direct pet-profile editing with return to the selected branch and pet.
+- Manager-only APIs for weekly groomer schedules and time off.
+- Database constraints prevent overlapping weekly schedules across branches.
+- Schedule management APIs are implemented; schedule UI, availability search and booking are not implemented yet.
 
 ## Stack
 

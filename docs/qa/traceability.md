@@ -209,38 +209,63 @@ Automated tests: [Catalog tests](../../apps/api/test/catalog.e2e-spec.ts).
 
 Automated tests: [Quote tests](../../apps/api/test/quotes.e2e-spec.ts).
 
-| Requirement ID | Acceptance criterion | Test case IDs | Coverage |
-| --- | --- | --- | --- |
-| REQ-QUOTE-001 | Authenticated users can calculate quotes only for their own non-archived pets | TC-QUOTE-002, TC-QUOTE-005, TC-QUOTE-006 | Implemented |
-| REQ-QUOTE-002 | Calculate item prices, total price in satang and total duration from stored pet data and catalog rates | TC-QUOTE-001, TC-QUOTE-007 | Implemented |
-| REQ-QUOTE-003 | Reject duplicate services and combining bath with bath and haircut | TC-QUOTE-003, TC-QUOTE-004 | Implemented |
-| REQ-QUOTE-004 | Reject missing pet weight and weight outside the selected service's supported range | TC-QUOTE-008, TC-QUOTE-009 | Implemented |
-| REQ-QUOTE-005 | Reject empty service lists, malformed service IDs and client-supplied price or weight fields | TC-QUOTE-010, TC-QUOTE-011 | Implemented |
-| REQ-QUOTE-006 | Return assessment flags for selected rabbit services | TC-QUOTE-012 | Implemented |
-| REQ-QUOTE-007 | Reject the whole quote when a selected service or matching rate is unavailable | TC-QUOTE-013, TC-QUOTE-014, TC-QUOTE-015 | Implemented |
-| REQ-QUOTE-008 | Reject quotes for inactive branches or business units | TC-QUOTE-016, TC-QUOTE-017 | Implemented |
+| Requirement ID | Acceptance criterion                                                                                   | Test case IDs                            | Coverage    |
+| -------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------- | ----------- |
+| REQ-QUOTE-001  | Authenticated users can calculate quotes only for their own non-archived pets                          | TC-QUOTE-002, TC-QUOTE-005, TC-QUOTE-006 | Implemented |
+| REQ-QUOTE-002  | Calculate item prices, total price in satang and total duration from stored pet data and catalog rates | TC-QUOTE-001, TC-QUOTE-007               | Implemented |
+| REQ-QUOTE-003  | Reject duplicate services and combining bath with bath and haircut                                     | TC-QUOTE-003, TC-QUOTE-004               | Implemented |
+| REQ-QUOTE-004  | Reject missing pet weight and weight outside the selected service's supported range                    | TC-QUOTE-008, TC-QUOTE-009               | Implemented |
+| REQ-QUOTE-005  | Reject empty service lists, malformed service IDs and client-supplied price or weight fields           | TC-QUOTE-010, TC-QUOTE-011               | Implemented |
+| REQ-QUOTE-006  | Return assessment flags for selected rabbit services                                                   | TC-QUOTE-012                             | Implemented |
+| REQ-QUOTE-007  | Reject the whole quote when a selected service or matching rate is unavailable                         | TC-QUOTE-013, TC-QUOTE-014, TC-QUOTE-015 | Implemented |
+| REQ-QUOTE-008  | Reject quotes for inactive branches or business units                                                  | TC-QUOTE-016, TC-QUOTE-017               | Implemented |
 
 ### Quote Test Case Index
 
-| Test case ID | Scenario |
-| --- | --- |
+| Test case ID | Scenario                                                                |
+| ------------ | ----------------------------------------------------------------------- |
 | TC-QUOTE-001 | Calculate multiple services and verify exact totals and no-store header |
-| TC-QUOTE-002 | Reject requests without a session |
-| TC-QUOTE-003 | Reject duplicate service IDs |
-| TC-QUOTE-004 | Reject bath combined with bath and haircut |
-| TC-QUOTE-005 | Reject access to another customer's pet |
-| TC-QUOTE-006 | Reject an archived pet |
-| TC-QUOTE-007 | Select correct rates at 5, 5.001 and 80 kg |
-| TC-QUOTE-008 | Reject weight above the supported range |
-| TC-QUOTE-009 | Reject a pet without recorded weight |
-| TC-QUOTE-010 | Reject empty service lists and malformed service IDs |
-| TC-QUOTE-011 | Reject client-supplied price and weight |
-| TC-QUOTE-012 | Calculate rabbit services and return assessment flags |
-| TC-QUOTE-013 | Reject an unknown service without returning a partial quote |
-| TC-QUOTE-014 | Reject an inactive service |
-| TC-QUOTE-015 | Reject an inactive matching rate |
-| TC-QUOTE-016 | Reject an inactive branch |
-| TC-QUOTE-017 | Reject an inactive business unit |
+| TC-QUOTE-002 | Reject requests without a session                                       |
+| TC-QUOTE-003 | Reject duplicate service IDs                                            |
+| TC-QUOTE-004 | Reject bath combined with bath and haircut                              |
+| TC-QUOTE-005 | Reject access to another customer's pet                                 |
+| TC-QUOTE-006 | Reject an archived pet                                                  |
+| TC-QUOTE-007 | Select correct rates at 5, 5.001 and 80 kg                              |
+| TC-QUOTE-008 | Reject weight above the supported range                                 |
+| TC-QUOTE-009 | Reject a pet without recorded weight                                    |
+| TC-QUOTE-010 | Reject empty service lists and malformed service IDs                    |
+| TC-QUOTE-011 | Reject client-supplied price and weight                                 |
+| TC-QUOTE-012 | Calculate rabbit services and return assessment flags                   |
+| TC-QUOTE-013 | Reject an unknown service without returning a partial quote             |
+| TC-QUOTE-014 | Reject an inactive service                                              |
+| TC-QUOTE-015 | Reject an inactive matching rate                                        |
+| TC-QUOTE-016 | Reject an inactive branch                                               |
+| TC-QUOTE-017 | Reject an inactive business unit                                        |
+
+## Groomer schedules and time off
+
+Test file: `apps/api/test/groomer-schedules.e2e-spec.ts`
+
+| Test IDs     | Coverage                                                                                |
+| ------------ | --------------------------------------------------------------------------------------- |
+| TC-SCHED-001 | Read an empty weekly schedule without exposing private user fields                      |
+| TC-SCHED-002 | Replace, sort and clear a weekly schedule while preserving another branch's schedule    |
+| TC-SCHED-003 | Reject invalid schedule input while preserving existing intervals and schedule version  |
+| TC-SCHED-004 | Allow adjacent working intervals                                                        |
+| TC-SCHED-005 | Reject overlapping schedules across branches without changing existing data             |
+| TC-SCHED-006 | Allow only one of two conflicting cross-branch requests sent together                   |
+| TC-SCHED-007 | Reject unauthenticated requests to all schedule endpoints                               |
+| TC-SCHED-008 | Reject customers and managers from another branch                                       |
+| TC-SCHED-009 | Reject malformed IDs and users without a groomer assignment                             |
+| TC-SCHED-010 | Reject schedule management after the groomer assignment is deactivated                  |
+| TC-SCHED-011 | Create, list and delete time off with UTC conversion and schedule version updates       |
+| TC-SCHED-012 | Reject invalid time-off input without creating records or changing the schedule version |
+| TC-SCHED-013 | Support full-day and overlapping time off with an optional reason                       |
+| TC-SCHED-014 | Isolate time-off listings by branch and prevent deletion through another branch         |
+
+The suite contains 27 tests across 14 test IDs because some cases use parameterized inputs.
+
+Scope: schedule management APIs only. Schedule UI, availability search and booking integration are not implemented in this increment.
 
 ## Maintenance
 

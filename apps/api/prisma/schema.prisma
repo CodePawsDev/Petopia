@@ -9,17 +9,19 @@ datasource db {
 }
 
 model User {
-  id               String            @id @default(uuid()) @db.Uuid
-  email            String            @unique @db.VarChar(254)
-  passwordHash     String            @map("password_hash")
-  displayName      String            @map("display_name") @db.VarChar(100)
-  active           Boolean           @default(true)
-  authVersion      Int               @default(1) @map("auth_version")
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
-  staffAssignments StaffAssignment[]
-  permissionGrants PermissionGrant[]
-  pets             Pet[]
+  id                      String                   @id @default(uuid()) @db.Uuid
+  email                   String                   @unique @db.VarChar(254)
+  passwordHash            String                   @map("password_hash")
+  displayName             String                   @map("display_name") @db.VarChar(100)
+  active                  Boolean                  @default(true)
+  authVersion             Int                      @default(1) @map("auth_version")
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  staffAssignments        StaffAssignment[]
+  permissionGrants        PermissionGrant[]
+  pets                    Pet[]
+  groomerWorkingIntervals GroomerWorkingInterval[]
+  groomerTimeOffs         GroomerTimeOff[]
 
   @@map("users")
 }
@@ -48,17 +50,19 @@ model BusinessUnit {
 }
 
 model Branch {
-  id               String            @id @default(uuid()) @db.Uuid
-  businessUnitId   String            @map("business_unit_id") @db.Uuid
-  code             String            @unique @db.VarChar(50)
-  name             String            @db.VarChar(100)
-  timezone         String            @default("Asia/Bangkok") @db.VarChar(100)
-  active           Boolean           @default(true)
-  scheduleVersion  Int               @default(1) @map("schedule_version")
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
-  staffAssignments StaffAssignment[]
-  permissionGrants PermissionGrant[]
+  id                      String                   @id @default(uuid()) @db.Uuid
+  businessUnitId          String                   @map("business_unit_id") @db.Uuid
+  code                    String                   @unique @db.VarChar(50)
+  name                    String                   @db.VarChar(100)
+  timezone                String                   @default("Asia/Bangkok") @db.VarChar(100)
+  active                  Boolean                  @default(true)
+  scheduleVersion         Int                      @default(1) @map("schedule_version")
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  staffAssignments        StaffAssignment[]
+  permissionGrants        PermissionGrant[]
+  groomerWorkingIntervals GroomerWorkingInterval[]
+  groomerTimeOffs         GroomerTimeOff[]
 
   businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
 
@@ -155,7 +159,7 @@ model GroomingService {
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  businessUnit BusinessUnit         @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
+  businessUnit BusinessUnit          @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
   rates        GroomingServiceRate[]
 
   @@unique([businessUnitId, code])
@@ -182,4 +186,40 @@ model GroomingServiceRate {
   @@unique([serviceId, species, minWeightKg, maxWeightKg])
   @@index([serviceId, species, active])
   @@map("grooming_service_rates")
+}
+
+model GroomerWorkingInterval {
+  id          String   @id @default(uuid()) @db.Uuid
+  groomerId   String   @map("groomer_id") @db.Uuid
+  branchId    String   @map("branch_id") @db.Uuid
+  weekday     Int
+  startMinute Int      @map("start_minute")
+  endMinute   Int      @map("end_minute")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  groomer User   @relation(fields: [groomerId], references: [id], onDelete: Restrict)
+  branch  Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([branchId, groomerId, weekday])
+  @@index([groomerId, weekday])
+  @@map("groomer_working_intervals")
+}
+
+model GroomerTimeOff {
+  id        String   @id @default(uuid()) @db.Uuid
+  groomerId String   @map("groomer_id") @db.Uuid
+  branchId  String   @map("branch_id") @db.Uuid
+  startsAt  DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt    DateTime @map("ends_at") @db.Timestamptz(3)
+  reason    String?  @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  groomer User   @relation(fields: [groomerId], references: [id], onDelete: Restrict)
+  branch  Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([branchId, groomerId, startsAt])
+  @@index([groomerId, startsAt, endsAt])
+  @@map("groomer_time_offs")
 }
