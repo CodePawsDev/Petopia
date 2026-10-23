@@ -265,7 +265,24 @@ Test file: `apps/api/test/groomer-schedules.e2e-spec.ts`
 
 The suite contains 27 tests across 14 test IDs because some cases use parameterized inputs.
 
-Scope: schedule management APIs only. Schedule UI, availability search and booking integration are not implemented in this increment.
+Scope: schedule management APIs and manager-facing schedule UI. Availability search and booking integration are not implemented yet.
+
+### Manual browser checks
+
+- Manager can select a branch groomer and manage weekly intervals.
+- Saved weekly intervals persist after refresh.
+- Overlapping intervals display validation messages beside the affected rows.
+- Time off can be created without a reason and displays in Asia/Bangkok time.
+- Time-off deletion requires confirmation.
+- Unsaved changes trigger confirmation when switching groomers or using the page's return link.
+- Groomer selection is disabled while a mutation is pending.
+- Customers and groomers cannot access the manager forms.
+- Unauthenticated access redirects to login.
+- Layout is checked at mobile viewport sizes.
+
+These are manual checks, not automated browser tests. Record their execution results in the QA review.
+
+Known limitation: in-app navigation through browser Back/Forward is not intercepted by the unsaved-change dialog.
 
 ## Maintenance
 
