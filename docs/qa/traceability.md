@@ -376,6 +376,33 @@ Manual checks reported by the developer:
 - Empty pagination page.
 - Invalid page returns 400.
 
+## Booking cancellation
+
+| Test ID       | Coverage                                                        | Evidence                 |
+| ------------- | --------------------------------------------------------------- | ------------------------ |
+| TC-CANCEL-001 | Cancels, preserves history, releases slot and permits rebooking | availability.e2e-spec.ts |
+| TC-CANCEL-002 | Repeated cancellation preserves updatedAt                       | availability.e2e-spec.ts |
+| TC-CANCEL-003 | Requires authentication                                         | availability.e2e-spec.ts |
+| TC-CANCEL-004 | Rejects another owner without changing the booking              | availability.e2e-spec.ts |
+| TC-CANCEL-005 | Rejects unknown and malformed IDs                               | availability.e2e-spec.ts |
+| TC-CANCEL-006 | Concurrent cancellations return the same result                 | availability.e2e-spec.ts |
+| TC-CANCEL-007 | Rejects cancellation after appointment start                    | availability.e2e-spec.ts |
+| TC-CANCEL-008 | Rejects COMPLETED and NO_SHOW bookings                          | availability.e2e-spec.ts |
+
+Validation reported by the developer on 2026-10-23:
+
+- API and web lint passed.
+- Unit tests: 12 passed across 2 suites.
+- E2E tests: 173 passed across 9 suites.
+- API and web builds passed.
+- Manual cancellation, repeated-request, history and slot-release checks passed.
+
+Cancellation adds 9 tests; availability.e2e-spec.ts now has 51 tests.
+The exact start-time boundary is enforced in code but has no dedicated test yet.
+
+Observed warning: pg reported concurrent client.query() usage.
+The source has not yet been traced; all tests passed.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.

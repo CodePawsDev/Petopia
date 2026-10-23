@@ -1197,4 +1197,237 @@ describe('Availability (e2e)', () => {
       });
     }
   });
+  it('[TC-CANCEL-001] cancels a booking, preserves its items and releases its slot', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const before = await prisma.groomingBooking.findFirstOrThrow({
+      where: { groomerId },
+      include: {
+        items: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+
+    const response = await customer
+      .post(`/bookings/${before.id}/cancel`)
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+
+    expect(response.body as unknown).toMatchObject({
+      id: before.id,
+      status: 'CANCELLED',
+    });
+
+    const after = await prisma.groomingBooking.findUniqueOrThrow({
+      where: { id: before.id },
+      include: {
+        items: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+
+    expect(after.status).toBe('CANCELLED');
+    expect(after.items).toEqual(before.items);
+    expect(after.totalPriceSatang).toBe(before.totalPriceSatang);
+    expect(after.startsAt).toEqual(before.startsAt);
+    expect(after.occupiedEndsAt).toEqual(before.occupiedEndsAt);
+
+    const detail = await customer.get(`/bookings/${before.id}`).expect(200);
+
+    expect(detail.body as unknown).toMatchObject({
+      status: 'CANCELLED',
+      totalPriceSatang: 40000,
+    });
+
+    const available = await customer
+      .post('/availability/search')
+      .send(payload())
+      .expect(200);
+
+    expect(starts(available.body)).toContain(localTime('09:00'));
+
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    expect(
+      await prisma.groomingBooking.count({
+        where: { groomerId, status: 'CONFIRMED' },
+      }),
+    ).toBe(1);
+
+    expect(
+      await prisma.groomingBooking.count({
+        where: { groomerId, status: 'CANCELLED' },
+      }),
+    ).toBe(1);
+  });
+
+  it('[TC-CANCEL-002] repeated cancellation preserves updatedAt', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const booking = await prisma.groomingBooking.findFirstOrThrow({
+      where: { groomerId },
+      select: { id: true },
+    });
+
+    const path = `/bookings/${booking.id}/cancel`;
+
+    const first = await customer.post(path).expect(200);
+
+    const stored = await prisma.groomingBooking.findUniqueOrThrow({
+      where: { id: booking.id },
+      select: { updatedAt: true },
+    });
+
+    const second = await customer.post(path).expect(200);
+
+    expect(second.body as unknown).toEqual(first.body as unknown);
+
+    expect(
+      await prisma.groomingBooking.findUniqueOrThrow({
+        where: { id: booking.id },
+        select: { updatedAt: true },
+      }),
+    ).toEqual(stored);
+  });
+
+  it('[TC-CANCEL-003] rejects cancellation without a session', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const booking = await prisma.groomingBooking.findFirstOrThrow({
+      where: { groomerId },
+    });
+
+    await request(app.getHttpServer())
+      .post(`/bookings/${booking.id}/cancel`)
+      .expect(401);
+
+    expect(
+      await prisma.groomingBooking.findUniqueOrThrow({
+        where: { id: booking.id },
+      }),
+    ).toEqual(booking);
+  });
+
+  it('[TC-CANCEL-004] hides another customer booking and preserves it', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const booking = await prisma.groomingBooking.findFirstOrThrow({
+      where: { groomerId },
+    });
+
+    const otherCustomer = request.agent(app.getHttpServer());
+
+    await otherCustomer
+      .post('/auth/login')
+      .send({
+        email: `availability-other-${runId}@example.com`,
+        password,
+      })
+      .expect(200);
+
+    await otherCustomer.post(`/bookings/${booking.id}/cancel`).expect(404);
+
+    expect(
+      await prisma.groomingBooking.findUniqueOrThrow({
+        where: { id: booking.id },
+      }),
+    ).toEqual(booking);
+  });
+
+  it('[TC-CANCEL-005] rejects an unknown or malformed booking ID', async () => {
+    await customer.post(`/bookings/${randomUUID()}/cancel`).expect(404);
+
+    await customer.post('/bookings/not-a-uuid/cancel').expect(400);
+  });
+
+  it('[TC-CANCEL-006] allows concurrent cancellation requests without repeated updates', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const booking = await prisma.groomingBooking.findFirstOrThrow({
+      where: { groomerId },
+      select: { id: true },
+    });
+
+    const path = `/bookings/${booking.id}/cancel`;
+
+    const responses = await Promise.all([
+      customer.post(path),
+      customer.post(path),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+
+    expect(responses[0].body as unknown).toEqual(responses[1].body as unknown);
+
+    expect(
+      await prisma.groomingBooking.count({
+        where: { groomerId, status: 'CANCELLED' },
+      }),
+    ).toBe(1);
+  });
+  it('[TC-CANCEL-007] rejects cancellation after the booking has started', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const booking = await prisma.groomingBooking.findFirstOrThrow({
+      where: { groomerId },
+      select: {
+        id: true,
+        totalDurationMinutes: true,
+        bufferMinutes: true,
+      },
+    });
+
+    // Move only this fixture into the past, preserving DB constraints.
+    const stepMs = 15 * 60_000;
+    const startsAt = new Date(
+      Math.floor(Date.now() / stepMs) * stepMs - stepMs,
+    );
+    const serviceEndsAt = new Date(
+      startsAt.getTime() + booking.totalDurationMinutes * 60_000,
+    );
+    const occupiedEndsAt = new Date(
+      serviceEndsAt.getTime() + booking.bufferMinutes * 60_000,
+    );
+
+    const before = await prisma.groomingBooking.update({
+      where: { id: booking.id },
+      data: {
+        startsAt,
+        serviceEndsAt,
+        occupiedEndsAt,
+      },
+    });
+
+    await customer.post(`/bookings/${booking.id}/cancel`).expect(409);
+
+    expect(
+      await prisma.groomingBooking.findUniqueOrThrow({
+        where: { id: booking.id },
+      }),
+    ).toEqual(before);
+  });
+
+  it.each(['COMPLETED', 'NO_SHOW'] as const)(
+    '[TC-CANCEL-008] rejects cancellation of a %s booking',
+    async (status) => {
+      await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+      const booking = await prisma.groomingBooking.findFirstOrThrow({
+        where: { groomerId },
+        select: { id: true },
+      });
+
+      // Prepare a terminal-status fixture directly.
+      const before = await prisma.groomingBooking.update({
+        where: { id: booking.id },
+        data: { status },
+      });
+
+      await customer.post(`/bookings/${booking.id}/cancel`).expect(409);
+
+      expect(
+        await prisma.groomingBooking.findUniqueOrThrow({
+          where: { id: booking.id },
+        }),
+      ).toEqual(before);
+    },
+  );
 });
