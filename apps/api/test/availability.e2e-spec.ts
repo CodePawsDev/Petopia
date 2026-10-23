@@ -1015,4 +1015,186 @@ describe('Availability (e2e)', () => {
 
     expect(bookings).toEqual([{ branchId: otherBranchId }]);
   });
+  it('[TC-BOOK-READ-001] lists and paginates only the current customer bookings', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    await customer
+      .post('/bookings')
+      .send({
+        ...bookingPayload(),
+        startsAt: localTime('13:00'),
+      })
+      .expect(201);
+
+    const first = await customer
+      .get('/bookings?page=1&limit=1')
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+
+    const second = await customer.get('/bookings?page=2&limit=1').expect(200);
+
+    const empty = await customer.get('/bookings?page=3&limit=1').expect(200);
+
+    expect(first.body as unknown).toMatchObject({
+      items: [
+        {
+          petId,
+          startsAt: localTime('13:00'),
+        },
+      ],
+      pagination: {
+        page: 1,
+        limit: 1,
+        total: 2,
+        totalPages: 2,
+      },
+    });
+
+    expect(second.body as unknown).toMatchObject({
+      items: [
+        {
+          petId,
+          startsAt: localTime('09:00'),
+        },
+      ],
+      pagination: {
+        page: 2,
+        limit: 1,
+        total: 2,
+        totalPages: 2,
+      },
+    });
+
+    expect(empty.body as unknown).toEqual({
+      items: [],
+      pagination: {
+        page: 3,
+        limit: 1,
+        total: 2,
+        totalPages: 2,
+      },
+    });
+  });
+
+  it('[TC-BOOK-READ-002] reads booking details without private account fields', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const booking = await prisma.groomingBooking.findFirstOrThrow({
+      where: { groomerId },
+      select: { id: true },
+    });
+
+    const response = await customer
+      .get(`/bookings/${booking.id}`)
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+
+    expect(response.body as unknown).toMatchObject({
+      id: booking.id,
+      petName: 'Availability Dog',
+      petWeightKg: 5,
+      totalPriceSatang: 40000,
+      totalDurationMinutes: 55,
+      branch: { id: branchId },
+      groomer: { id: groomerId },
+    });
+
+    const body = readRecord(response.body);
+    const groomer = readRecord(body.groomer);
+
+    expect(body).not.toHaveProperty('ownerId');
+    expect(body).not.toHaveProperty('owner');
+    expect(Object.keys(groomer).sort()).toEqual(['displayName', 'id']);
+  });
+
+  it('[TC-BOOK-READ-003] hides another customer booking from detail and list endpoints', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const booking = await prisma.groomingBooking.findFirstOrThrow({
+      where: { groomerId },
+      select: { id: true },
+    });
+
+    const otherCustomer = request.agent(app.getHttpServer());
+
+    await otherCustomer
+      .post('/auth/login')
+      .send({
+        email: `availability-other-${runId}@example.com`,
+        password,
+      })
+      .expect(200);
+
+    await otherCustomer.get(`/bookings/${booking.id}`).expect(404);
+
+    const listed = await otherCustomer.get('/bookings').expect(200);
+
+    expect(listed.body as unknown).toEqual({
+      items: [],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+      },
+    });
+  });
+
+  it('[TC-BOOK-READ-004] requires a session for both read endpoints', async () => {
+    await request(app.getHttpServer()).get('/bookings').expect(401);
+
+    await request(app.getHttpServer())
+      .get(`/bookings/${randomUUID()}`)
+      .expect(401);
+  });
+
+  it.each([
+    '/bookings?page=0',
+    '/bookings?page=abc',
+    '/bookings?limit=101',
+    '/bookings?limit=1.5',
+    '/bookings/not-a-uuid',
+  ])('[TC-BOOK-READ-005] rejects invalid input: %s', async (path) => {
+    await customer.get(path).expect(400);
+  });
+
+  it('[TC-BOOK-READ-006] preserves booking pet snapshots after profile changes and archival', async () => {
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const booking = await prisma.groomingBooking.findFirstOrThrow({
+      where: { groomerId },
+      select: { id: true },
+    });
+
+    try {
+      await prisma.pet.update({
+        where: { id: petId },
+        data: {
+          name: 'Changed Name',
+          weightKg: 8,
+          archivedAt: new Date(),
+        },
+      });
+
+      const response = await customer
+        .get(`/bookings/${booking.id}`)
+        .expect(200);
+
+      expect(response.body as unknown).toMatchObject({
+        petName: 'Availability Dog',
+        petWeightKg: 5,
+        totalPriceSatang: 40000,
+        totalDurationMinutes: 55,
+      });
+    } finally {
+      await prisma.pet.update({
+        where: { id: petId },
+        data: {
+          name: 'Availability Dog',
+          weightKg: 5,
+          archivedAt: null,
+        },
+      });
+    }
+  });
 });

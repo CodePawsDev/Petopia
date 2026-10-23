@@ -385,6 +385,24 @@ without available slots.
 Existing confirmed, completed and no-show bookings block the groomer's
 occupied interval across branches. Cancelled bookings do not block slots.
 
+## My bookings API
+
+Authenticated customers can read their own bookings:
+
+- GET /bookings?page=1&limit=20
+- GET /bookings/:bookingId
+
+Pagination defaults to page 1 with 20 items, with a maximum of
+100 items per page. Results are ordered by appointment start
+descending, then booking ID ascending.
+
+List responses contain items and pagination metadata.
+Another customer's booking returns 404.
+
+Pet details, prices and durations use booking-time snapshots.
+Branch and groomer names use current data. Archived pets remain
+readable through their booking history.
+
 ## Grooming booking creation API
 
 Authenticated customers can create a booking with `POST /bookings`,
@@ -405,7 +423,7 @@ upcoming or ongoing confirmed bookings, including their buffer.
 
 Assessment-required services cannot be booked through this endpoint yet.
 
-Remaining work includes booking read/cancellation APIs, payment recording,
+Remaining work includes booking cancellation API, payment recording,
 booking UI and the assessment workflow.
 
 ## Planned work

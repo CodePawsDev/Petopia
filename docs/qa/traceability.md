@@ -355,6 +355,27 @@ Validation reported by the developer on 2026-10-23:
 The availability E2E file now contains 32 tests:
 18 availability tests and 14 booking integration tests.
 
+## My bookings API
+
+| Test ID          | Coverage                                           | Evidence                 |
+| ---------------- | -------------------------------------------------- | ------------------------ |
+| TC-BOOK-READ-001 | Pagination, ordering and empty pages               | availability.e2e-spec.ts |
+| TC-BOOK-READ-002 | Booking details and restricted account fields      | availability.e2e-spec.ts |
+| TC-BOOK-READ-003 | Owner isolation for detail, list and totals        | availability.e2e-spec.ts |
+| TC-BOOK-READ-004 | Both read endpoints require authentication         | availability.e2e-spec.ts |
+| TC-BOOK-READ-005 | Invalid pagination and booking ID inputs           | availability.e2e-spec.ts |
+| TC-BOOK-READ-006 | Pet snapshots survive profile changes and archival | availability.e2e-spec.ts |
+
+The read API adds 10 automated tests to availability.e2e-spec.ts,
+bringing that file to 42 tests.
+
+Manual checks reported by the developer:
+
+- Customer list and booking detail.
+- Another account receives 404 for the customer's booking.
+- Empty pagination page.
+- Invalid page returns 400.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.
