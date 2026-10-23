@@ -37,7 +37,9 @@ The first planned business flow is grooming service booking. The project is curr
 - Direct pet-profile editing with return to the selected branch and pet.
 - Manager-only APIs for weekly groomer schedules and time off.
 - Database constraints prevent overlapping weekly schedules across branches.
-- Schedule management APIs are implemented; schedule UI, availability search and booking are not implemented yet.
+- Manager workspace UI for weekly groomer schedules and time-off management.
+- Unsaved-change confirmation when switching groomers or using the page's return link, plus browser unload warnings.
+- Availability search and booking are not implemented yet.
 
 ## Stack
 

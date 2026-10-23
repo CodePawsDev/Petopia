@@ -174,10 +174,24 @@ export default function WorkspaceView({
             </div>
 
             <div className="mt-6 border-t border-border pt-6">
-              <h2 className="font-semibold">ยังไม่มีรายการในพื้นที่ทำงานนี้</h2>
-              <p className="mt-2 text-sm leading-7 text-muted">
-                ฟังก์ชันการทำงานส่วนนี้อยู่ระหว่างพัฒนา
-              </p>
+              {workspace === 'manager' ? (
+                <Link
+                  href={`/branches/${encodeURIComponent(branchId)}/groomer-schedules`}
+                  className="flex min-h-14 items-center justify-between gap-4 rounded-2xl border border-border bg-surface-soft px-5 py-4 font-semibold text-primary hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  <span>ตารางช่างและวันหยุด</span>
+                  <span aria-hidden="true">→</span>
+                </Link>
+              ) : (
+                <>
+                  <h2 className="font-semibold">
+                    ยังไม่มีรายการในพื้นที่ทำงานนี้
+                  </h2>
+                  <p className="mt-2 text-sm leading-7 text-muted">
+                    ฟังก์ชันการทำงานส่วนนี้อยู่ระหว่างพัฒนา
+                  </p>
+                </>
+              )}
             </div>
           </div>
         ) : (
