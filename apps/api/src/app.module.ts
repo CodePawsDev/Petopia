@@ -10,6 +10,7 @@ import { BranchWorkspaceModule } from './branch-workspace/branch-workspace.modul
 import { PetsModule } from './pets/pets.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { GroomerSchedulesModule } from './groomer-schedules/groomer-schedules.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { QuotesModule } from './quotes/quotes.module';
     PetsModule,
     CatalogModule,
     QuotesModule,
+    GroomerSchedulesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
