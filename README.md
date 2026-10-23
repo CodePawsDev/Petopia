@@ -32,6 +32,9 @@ The first planned business flow is grooming service booking. The project is curr
 - Branch groomer lists and assessment notices.
 - Authenticated multi-service quote API using stored pet species, weight and catalog rates.
 - Server-side service combination checks, price and duration totals, and assessment flags.
+- Multi-service selection and server-calculated quotes for an authenticated customer's pet.
+- Service prices displayed using stored pet species and weight.
+- Direct pet-profile editing with return to the selected branch and pet.
 
 ## Stack
 

@@ -14,10 +14,17 @@ export default function ServiceCard({
   service,
   weight,
   hasWeightError,
+  selection,
 }: {
   service: CatalogService;
   weight: number | null;
   hasWeightError: boolean;
+  selection?: {
+    checked: boolean;
+    disabled: boolean;
+    reason?: string;
+    onChange: () => void;
+  };
 }) {
   const matchingRates =
     weight === null
@@ -28,12 +35,27 @@ export default function ServiceCard({
 
   const matchingRate = matchingRates.length === 1 ? matchingRates[0] : null;
 
-  const startingPrice = Math.min(
-    ...service.rates.map((rate) => rate.priceSatang),
-  );
+  const startingPrice =
+    service.rates.length > 0
+      ? Math.min(...service.rates.map((rate) => rate.priceSatang))
+      : null;
+
+  const requiresAssessment = matchingRate
+    ? matchingRate.requiresAssessment
+    : service.rates.some((rate) => rate.requiresAssessment);
+
+  const canSelect =
+    !hasWeightError &&
+    matchingRate !== null &&
+    selection !== undefined &&
+    !selection.disabled;
 
   return (
-    <article className="h-full rounded-3xl border border-border bg-surface p-6 shadow-sm">
+    <article
+      className={`h-full rounded-3xl border bg-surface p-6 shadow-sm ${
+        selection?.checked ? 'border-primary' : 'border-border'
+      }`}
+    >
       <h3 className="text-xl font-bold">{service.name}</h3>
 
       {service.description && (
@@ -46,15 +68,19 @@ export default function ServiceCard({
         {hasWeightError ? (
           <p className="text-sm text-muted">กรุณาตรวจสอบน้ำหนักเพื่อดูราคา</p>
         ) : weight === null ? (
-          <>
-            <p className="text-sm text-muted">ราคาเริ่มต้น</p>
-            <p className="mt-1 text-2xl font-bold text-primary">
-              {priceFormatter.format(startingPrice / 100)}
-            </p>
-            <p className="mt-2 text-xs leading-6 text-muted">
-              ระบุน้ำหนักเพื่อดูราคาและระยะเวลาที่ตรงกับสัตว์เลี้ยง
-            </p>
-          </>
+          startingPrice === null ? (
+            <p className="text-sm text-muted">ยังไม่มีราคาสำหรับบริการนี้</p>
+          ) : (
+            <>
+              <p className="text-sm text-muted">ราคาเริ่มต้น</p>
+              <p className="mt-1 text-2xl font-bold text-primary">
+                {priceFormatter.format(startingPrice / 100)}
+              </p>
+              <p className="mt-2 text-xs leading-6 text-muted">
+                ราคาขึ้นอยู่กับน้ำหนักสัตว์เลี้ยง
+              </p>
+            </>
+          )
         ) : matchingRate ? (
           <>
             <p className="text-sm text-muted">
@@ -74,10 +100,44 @@ export default function ServiceCard({
         )}
       </div>
 
-      {service.rates.some((rate) => rate.requiresAssessment) && (
+      {requiresAssessment && (
         <p className="mt-4 text-sm font-medium text-primary">
           ต้องให้เจ้าหน้าที่ประเมินก่อนยืนยันการจอง
         </p>
+      )}
+
+      {selection && (
+        <div className="mt-5 border-t border-border pt-4">
+          <label
+            className={`flex min-h-12 items-center gap-3 rounded-xl ${
+              canSelect ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={selection.checked}
+              disabled={!canSelect}
+              onChange={selection.onChange}
+              aria-describedby={
+                selection.reason ? `service-${service.id}-hint` : undefined
+              }
+              className="size-5 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            />
+            <span className="font-semibold">
+              {selection.checked ? 'เลือกแล้ว' : 'เลือกบริการนี้'}
+              <span className="sr-only"> {service.name}</span>
+            </span>
+          </label>
+
+          {selection.reason && (
+            <p
+              id={`service-${service.id}-hint`}
+              className="mt-1 text-sm text-muted"
+            >
+              {selection.reason}
+            </p>
+          )}
+        </div>
       )}
     </article>
   );
