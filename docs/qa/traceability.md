@@ -284,6 +284,46 @@ These are manual checks, not automated browser tests. Record their execution res
 
 Known limitation: in-app navigation through browser Back/Forward is not intercepted by the unsaved-change dialog.
 
+## Grooming availability
+
+| Test ID    | Coverage                                                       | Evidence                 |
+| ---------- | -------------------------------------------------------------- | ------------------------ |
+| TC-AVL-001 | Quote totals, Bangkok time, start intervals, breaks and buffer | availability.e2e-spec.ts |
+| TC-AVL-002 | Search without selecting a groomer                             | availability.e2e-spec.ts |
+| TC-AVL-003 | Cross-branch time off and buffer overlap                       | availability.e2e-spec.ts |
+| TC-AVL-004 | Branch closure overlap and adjacent boundaries                 | availability.e2e-spec.ts |
+| TC-AVL-005 | Closures are isolated by branch                                | availability.e2e-spec.ts |
+| TC-AVL-006 | Fully closed branch returns no slots                           | availability.e2e-spec.ts |
+| TC-AVL-007 | Every selected service requires an active species skill        | availability.e2e-spec.ts |
+| TC-AVL-008 | Inactive branch assignment is rejected                         | availability.e2e-spec.ts |
+| TC-AVL-009 | Inactive groomer is rejected                                   | availability.e2e-spec.ts |
+| TC-AVL-010 | Assessment-required services return no slots                   | availability.e2e-spec.ts |
+| TC-AVL-011 | Authentication is required                                     | availability.e2e-spec.ts |
+| TC-AVL-012 | Another customer's pet is inaccessible                         | availability.e2e-spec.ts |
+| TC-AVL-013 | Archived pets are rejected                                     | availability.e2e-spec.ts |
+| TC-AVL-014 | Missing stored weight is rejected                              | availability.e2e-spec.ts |
+| TC-AVL-015 | Invalid dates and malformed groomer IDs are rejected           | availability.e2e-spec.ts |
+| TC-AVL-016 | Dates beyond the booking window return no slots                | availability.e2e-spec.ts |
+
+Rule-level boundary tests are in
+`apps/api/src/availability/availability-rules.spec.ts`.
+
+Validation reported by the developer on 2026-10-23:
+
+- API and web lint passed.
+- API unit tests: 12 passed across 2 suites.
+- API E2E tests: 140 passed across 9 suites.
+- API and web production builds passed.
+- Manual Postman checks passed for specific/any groomer,
+  assessment-required services, unauthenticated requests,
+  invalid dates and dates beyond the booking window.
+
+The totals cover the whole API, not availability alone.
+Availability E2E coverage contains 18 tests.
+
+Existing booking conflicts and atomic booking creation are
+outside the current implementation.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.

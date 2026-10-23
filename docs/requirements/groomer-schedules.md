@@ -43,9 +43,61 @@ Status: Agreed for initial implementation
 - Availability search, booking creation and booking conflict protection follow separately.
 - Before booking integration, define how schedule changes interact with existing bookings.
 
-## Deferred decisions
+## Availability rules
 
-- Slot start-time increments and booking lead time.
-- Booking horizon and travel buffers between branches.
-- Rabbit assessment and confirmation workflow.
-- Schedule changes must not silently invalidate existing bookings.
+- Demo branches operate from 09:00 to 18:00 in Asia/Bangkok.
+- Appointment starts follow 15-minute clock boundaries: :00, :15, :30 and :45.
+- Service durations are taken from the current catalog and are not rounded to 15-minute increments.
+- One appointment is for one pet at one branch.
+- Multiple distinct services may be selected according to catalog selection rules.
+- One groomer performs all selected services sequentially.
+- The groomer must have active eligibility for the pet species and every selected service.
+- The groomer's account, branch assignment, branch and business unit must be active.
+- Selected services and applicable rates must also be active.
+
+## Buffer and occupied intervals
+
+- Add one 15-minute buffer after the total service duration.
+- Do not add a separate buffer for each service.
+- Customer-facing service duration excludes the buffer.
+- The occupied interval includes its start and excludes its end.
+- The complete service and buffer must fit within one continuous working interval.
+- The occupied interval must not overlap breaks, groomer time off, branch closures or blocking bookings.
+- Groomer time off applies across all branches.
+- Branch closures may cover a full day or part of a day.
+- Adjacent occupied intervals are allowed.
+- Example: a 09:00 appointment with 55 minutes of services occupies the groomer until 10:10. The next eligible clock boundary is 10:15, subject to other availability rules.
+
+## Booking window
+
+- Use the server's current time.
+- Appointment starts must be at least two hours ahead.
+- Appointment starts must be no more than 30 days ahead.
+- Both boundaries are inclusive.
+- Thirty days means 30 times 24 hours, not the end of the thirtieth calendar day.
+- Evaluate the time consistently within a request and recheck it when creating a booking.
+
+## Availability and booking consistency
+
+- Availability results do not reserve a slot.
+- Availability and booking creation must share the same eligibility and time rules.
+- Booking creation must recheck current data and assign the groomer atomically.
+- Schedule, time-off and closure changes must reject conflicts with existing blocking bookings once booking integration is implemented.
+- Changes must not silently move or cancel existing bookings.
+- Groomer time-off changes must invalidate affected availability across branches; the originating branch's scheduleVersion alone is insufficient.
+
+## Remaining implementation
+
+- Groomer eligibility data by species and service.
+- Branch closure data.
+- Availability calculation and read API.
+- Booking integration and conflict protection.
+- Cross-branch availability invalidation if availability is cached.
+- Travel buffers between branches remain deferred.
+
+## Unresolved rabbit assessment workflow
+
+- Rabbit catalog rates currently require assessment.
+- Whether assessment occurs before booking submission or before confirmation remains unresolved.
+- Availability must not be presented as approval to automatically confirm an assessment-required booking.
+- Resolve this workflow before implementing rabbit booking confirmation.

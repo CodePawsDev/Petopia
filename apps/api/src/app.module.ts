@@ -11,6 +11,7 @@ import { PetsModule } from './pets/pets.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { GroomerSchedulesModule } from './groomer-schedules/groomer-schedules.module';
+import { AvailabilityModule } from './availability/availability.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { GroomerSchedulesModule } from './groomer-schedules/groomer-schedules.mo
     CatalogModule,
     QuotesModule,
     GroomerSchedulesModule,
+    AvailabilityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

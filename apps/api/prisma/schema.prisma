@@ -22,6 +22,7 @@ model User {
   pets                    Pet[]
   groomerWorkingIntervals GroomerWorkingInterval[]
   groomerTimeOffs         GroomerTimeOff[]
+  groomerServiceSkills    GroomerServiceSkill[]
 
   @@map("users")
 }
@@ -62,9 +63,10 @@ model Branch {
   staffAssignments        StaffAssignment[]
   permissionGrants        PermissionGrant[]
   groomerWorkingIntervals GroomerWorkingInterval[]
-  groomerTimeOffs         GroomerTimeOff[]
+  closures                BranchClosure[]
 
-  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
+  businessUnit    BusinessUnit     @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
+  groomerTimeOffs GroomerTimeOff[]
 
   @@index([businessUnitId])
   @@map("branches")
@@ -159,8 +161,9 @@ model GroomingService {
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  businessUnit BusinessUnit          @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
-  rates        GroomingServiceRate[]
+  businessUnit  BusinessUnit          @relation(fields: [businessUnitId], references: [id], onDelete: Restrict)
+  rates         GroomingServiceRate[]
+  groomerSkills GroomerServiceSkill[]
 
   @@unique([businessUnitId, code])
   @@unique([businessUnitId, kind])
@@ -222,4 +225,36 @@ model GroomerTimeOff {
   @@index([branchId, groomerId, startsAt])
   @@index([groomerId, startsAt, endsAt])
   @@map("groomer_time_offs")
+}
+
+model GroomerServiceSkill {
+  id        String     @id @default(uuid()) @db.Uuid
+  groomerId String     @map("groomer_id") @db.Uuid
+  serviceId String     @map("service_id") @db.Uuid
+  species   PetSpecies
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  groomer User            @relation(fields: [groomerId], references: [id], onDelete: Restrict)
+  service GroomingService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@unique([groomerId, serviceId, species])
+  @@index([serviceId, species, active])
+  @@map("groomer_service_skills")
+}
+
+model BranchClosure {
+  id        String   @id @default(uuid()) @db.Uuid
+  branchId  String   @map("branch_id") @db.Uuid
+  startsAt  DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt    DateTime @map("ends_at") @db.Timestamptz(3)
+  reason    String?  @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([branchId, startsAt, endsAt])
+  @@map("branch_closures")
 }

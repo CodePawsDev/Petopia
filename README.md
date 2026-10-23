@@ -361,6 +361,31 @@ Commit migration files. Do not edit migrations that have already been applied an
 - E2E database safety check failed: check `.env.test` and shell-level environment overrides.
 - Port already in use: stop the process using port 3000 or 3001 before starting the app.
 
+## Grooming availability API
+
+Authenticated customers can search availability with
+`POST /availability/search`.
+
+The request accepts `branchId`, `petId`, `serviceIds`, `date`
+(`YYYY-MM-DD`) and an optional `groomerId`. Pet species and weight
+come from the customer's active pet profile.
+
+Availability uses:
+
+- Active branch groomers qualified for every selected service and species.
+- Weekly working intervals, breaks and groomer time off across branches.
+- Branch closures.
+- Start times every 15 minutes.
+- Total service duration plus one 15-minute buffer.
+- A booking window from 2 hours to 30 days ahead.
+
+Services requiring assessment return `ASSESSMENT_REQUIRED`
+without available slots.
+
+Current limitation: existing bookings are not deducted yet.
+Booking creation and atomic conflict prevention will be added
+with the booking workflow.
+
 ## Planned work
 
 - Grooming services, pricing and staff schedules.
