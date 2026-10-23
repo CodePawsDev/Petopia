@@ -162,9 +162,51 @@ async function main(): Promise<void> {
           permission: StaffPermission.RECEIVE_PAYMENT,
         },
       });
+      const grooming = await tx.businessUnit.findUniqueOrThrow({
+        where: { code: 'GROOMING' },
+        select: { id: true },
+      });
+
+      const serviceSpecies = await tx.groomingServiceRate.findMany({
+        where: {
+          active: true,
+          service: {
+            businessUnitId: grooming.id,
+            active: true,
+          },
+        },
+        distinct: ['serviceId', 'species'],
+        select: {
+          serviceId: true,
+          species: true,
+        },
+      });
+
+      if (serviceSpecies.length === 0) {
+        throw new Error(
+          'No active grooming rates found. Run the baseline seed first.',
+        );
+      }
+
+      const skills = [groomer.id, onnutGroomer.id].flatMap((groomerId) =>
+        serviceSpecies.map((pair) => ({
+          groomerId,
+          serviceId: pair.serviceId,
+          species: pair.species,
+        })),
+      );
+
+      const result = await tx.groomerServiceSkill.createMany({
+        data: skills,
+        skipDuplicates: true,
+      });
+
+      console.log(`Demo groomer skills added: ${result.count}`);
     });
 
-    console.log('Demo seed completed: five accounts and branch permissions.');
+    console.log(
+      'Demo seed completed: five accounts, branch permissions and groomer skills.',
+    );
   } finally {
     await prisma.$disconnect();
   }
