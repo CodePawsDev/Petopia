@@ -459,6 +459,46 @@ Implementation:
 
 Executed manually by the developer on local Windows on 2026-10-24.
 
+## Branch bookings API
+
+Automated tests: `apps/api/test/branch-bookings.e2e-spec.ts`
+
+| Test ID       | Coverage                                                             |
+| ------------- | -------------------------------------------------------------------- |
+| TC-BRBOOK-001 | Manager lists only the requested branch, ordered by appointment time |
+| TC-BRBOOK-002 | Groomer sees only their own appointments and scoped totals           |
+| TC-BRBOOK-003 | Pagination and empty out-of-range pages                              |
+| TC-BRBOOK-004 | Bangkok calendar-date filtering and midnight boundaries              |
+| TC-BRBOOK-005 | Stored booking snapshots and restricted public user fields           |
+| TC-BRBOOK-006 | Authentication required on both endpoints                            |
+| TC-BRBOOK-007 | Customers and payment-only accounts denied                           |
+| TC-BRBOOK-008 | Manager and groomer roles remain separate                            |
+| TC-BRBOOK-009 | Staff from another branch denied                                     |
+| TC-BRBOOK-010 | Assignment revocation applies to existing sessions                   |
+| TC-BRBOOK-011 | Inactive branch access denied                                        |
+| TC-BRBOOK-012 | Invalid and unsupported queries rejected                             |
+| TC-BRBOOK-013 | Malformed branch IDs rejected                                        |
+| TC-BRBOOK-014 | Unsupported branch timezones rejected                                |
+
+### Verification — 2026-10-24
+
+Developer executed locally on Windows:
+
+- API and web lint passed.
+- API unit tests: 12 passed across 2 suites.
+- Branch bookings E2E: 22 tests passed across 14 test IDs.
+- Full API E2E suite: 203 passed across 10 suites.
+- API and web production builds passed.
+- `git diff --check` reported no whitespace errors.
+- Manual Postman checks passed for manager and groomer access,
+  role separation, branch isolation, unauthenticated access and invalid dates.
+
+The full E2E total covers the entire API, not branch bookings alone.
+The existing pg concurrent-query deprecation warning remains unresolved.
+
+Scope: read-only manager and groomer endpoints.
+Staff UI and booking status updates are separate work.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.
