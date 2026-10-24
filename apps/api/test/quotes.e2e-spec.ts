@@ -167,6 +167,7 @@ describe('Service quotes (e2e)', () => {
     const body = response.body as Record<string, unknown>;
 
     expect(body).toEqual({
+      quoteHash: expect.stringMatching(/^[0-9a-f]{64}$/) as unknown,
       branch: expect.objectContaining({ id: branchId }) as unknown,
       pet: {
         id: petId,

@@ -16,6 +16,7 @@ import { ConflictException } from '@nestjs/common';
 import { GroomerSchedulesService } from '../src/groomer-schedules/groomer-schedules.service';
 import { GroomerTimeOffsService } from '../src/groomer-schedules/groomer-time-offs.service';
 import { BranchClosuresService } from '../src/branch-closures/branch-closures.service';
+import { QuotesService } from '../src/quotes/quotes.service';
 
 type Slot = {
   startsAt: string;
@@ -81,6 +82,7 @@ describe('Availability (e2e)', () => {
   let nailId: string;
   let date: string;
   let weekday: number;
+  let expectedQuoteHash: string;
 
   const runId = randomUUID();
   const branchId = randomUUID();
@@ -101,6 +103,22 @@ describe('Availability (e2e)', () => {
   function localTime(time: string, targetDate = date): string {
     return new Date(`${targetDate}T${time}:00+07:00`).toISOString();
   }
+  async function quoteHashFor(
+    quoteOwnerId = ownerId,
+    quoteBranchId = branchId,
+    quotePetId = petId,
+  ): Promise<string> {
+    const quote = await app.get(QuotesService).create(quoteOwnerId, {
+      branchId: quoteBranchId,
+      petId: quotePetId,
+      serviceIds: [bathId, nailId],
+    });
+
+    expect(quote.quoteHash).toMatch(/^[0-9a-f]{64}$/);
+
+    return quote.quoteHash;
+  }
+
   function bookingPayload() {
     return {
       branchId,
@@ -109,6 +127,7 @@ describe('Availability (e2e)', () => {
       serviceIds: [bathId, nailId],
       startsAt: localTime('09:00'),
       requestKey: randomUUID(),
+      expectedQuoteHash,
     };
   }
 
@@ -365,6 +384,7 @@ describe('Availability (e2e)', () => {
         ],
       });
     });
+    expectedQuoteHash = await quoteHashFor();
   });
 
   afterAll(async () => {
@@ -1218,6 +1238,11 @@ describe('Availability (e2e)', () => {
         ...body,
         petId: otherPetId,
         startsAt: localTime('13:00'),
+        expectedQuoteHash: await quoteHashFor(
+          otherOwnerId,
+          branchId,
+          otherPetId,
+        ),
       })
       .expect(201);
 
@@ -1231,6 +1256,248 @@ describe('Availability (e2e)', () => {
       }),
     ).toBe(2);
   });
+  it.each([
+    {
+      name: 'price',
+      priceDelta: 5000,
+      durationDelta: 0,
+    },
+    {
+      name: 'duration',
+      priceDelta: 0,
+      durationDelta: 15,
+    },
+  ])(
+    '[TC-REQUOTE-001] requires reconfirmation when the service $name changes',
+    async ({ priceDelta, durationDelta }) => {
+      const body = bookingPayload();
+
+      const originalQuote = await app.get(QuotesService).create(ownerId, {
+        branchId,
+        petId,
+        serviceIds: [bathId, nailId],
+      });
+
+      const bath = originalQuote.items.find(
+        (item) => item.serviceId === bathId,
+      );
+
+      if (!bath) {
+        throw new Error('Expected bath quote item');
+      }
+
+      const originalRate = await prisma.groomingServiceRate.findUniqueOrThrow({
+        where: { id: bath.rateId },
+      });
+
+      try {
+        await prisma.groomingServiceRate.update({
+          where: { id: originalRate.id },
+          data: {
+            priceSatang: originalRate.priceSatang + priceDelta,
+            durationMinutes: originalRate.durationMinutes + durationDelta,
+          },
+        });
+
+        const rejected = await customer
+          .post('/bookings')
+          .send(body)
+          .expect(409);
+
+        expect(rejected.body as unknown).toMatchObject({
+          code: 'QUOTE_CHANGED',
+          quote: {
+            totalPriceSatang: originalQuote.totalPriceSatang + priceDelta,
+            totalDurationMinutes:
+              originalQuote.totalDurationMinutes + durationDelta,
+          },
+        });
+
+        const errorBody = readRecord(rejected.body as unknown);
+        const latestQuote = readRecord(errorBody.quote);
+        const latestHash = latestQuote.quoteHash;
+
+        if (typeof latestHash !== 'string') {
+          throw new Error('Expected latest quote hash');
+        }
+
+        expect(latestHash).toMatch(/^[0-9a-f]{64}$/);
+        expect(latestHash).not.toBe(body.expectedQuoteHash);
+
+        await expectNoBookings();
+
+        expect(
+          await prisma.groomingBookingRequest.count({
+            where: { ownerId, requestKey: body.requestKey },
+          }),
+        ).toBe(0);
+
+        // Retrying the old quote must still require reconfirmation.
+        const repeated = await customer
+          .post('/bookings')
+          .send(body)
+          .expect(409);
+
+        expect(repeated.body as unknown).toMatchObject({
+          code: 'QUOTE_CHANGED',
+        });
+
+        await expectNoBookings();
+
+        // Model a deliberate confirmation of the latest quote.
+        const confirmedBody = {
+          ...body,
+          requestKey: randomUUID(),
+          expectedQuoteHash: latestHash,
+        };
+
+        const confirmed = await customer
+          .post('/bookings')
+          .send(confirmedBody)
+          .expect(201);
+
+        const expectedDuration =
+          originalQuote.totalDurationMinutes + durationDelta;
+
+        expect(confirmed.body as unknown).toMatchObject({
+          status: 'CONFIRMED',
+          paymentStatus: 'UNPAID',
+          totalPriceSatang: originalQuote.totalPriceSatang + priceDelta,
+          totalDurationMinutes: expectedDuration,
+          serviceEndsAt: new Date(
+            Date.parse(body.startsAt) + expectedDuration * 60_000,
+          ).toISOString(),
+          occupiedEndsAt: new Date(
+            Date.parse(body.startsAt) + (expectedDuration + 15) * 60_000,
+          ).toISOString(),
+        });
+
+        expect(
+          await prisma.groomingBooking.count({
+            where: { groomerId },
+          }),
+        ).toBe(1);
+
+        expect(
+          await prisma.groomingBookingRequest.count({
+            where: { ownerId, requestKey: body.requestKey },
+          }),
+        ).toBe(0);
+
+        expect(
+          await prisma.groomingBookingRequest.count({
+            where: {
+              ownerId,
+              requestKey: confirmedBody.requestKey,
+            },
+          }),
+        ).toBe(1);
+      } finally {
+        await prisma.groomingServiceRate.update({
+          where: { id: originalRate.id },
+          data: {
+            priceSatang: originalRate.priceSatang,
+            durationMinutes: originalRate.durationMinutes,
+          },
+        });
+      }
+    },
+  );
+
+  it('[TC-REQUOTE-002] replays the original booking after catalog prices change', async () => {
+    const body = bookingPayload();
+
+    const quote = await app.get(QuotesService).create(ownerId, {
+      branchId,
+      petId,
+      serviceIds: [bathId, nailId],
+    });
+
+    const bath = quote.items.find((item) => item.serviceId === bathId);
+
+    if (!bath) {
+      throw new Error('Expected bath quote item');
+    }
+
+    const originalRate = await prisma.groomingServiceRate.findUniqueOrThrow({
+      where: { id: bath.rateId },
+    });
+
+    const created = await customer.post('/bookings').send(body).expect(201);
+
+    const original = readRecord(created.body as unknown);
+
+    try {
+      await prisma.groomingServiceRate.update({
+        where: { id: originalRate.id },
+        data: {
+          priceSatang: originalRate.priceSatang + 5000,
+        },
+      });
+
+      const latestHash = await quoteHashFor();
+
+      expect(latestHash).not.toBe(body.expectedQuoteHash);
+
+      const repeated = await customer.post('/bookings').send(body).expect(201);
+
+      expect(repeated.body as unknown).toEqual(created.body as unknown);
+
+      if (typeof original.id !== 'string') {
+        throw new Error('Expected booking ID');
+      }
+
+      const detail = await customer.get(`/bookings/${original.id}`).expect(200);
+
+      expect(detail.body as unknown).toMatchObject({
+        id: original.id,
+        totalPriceSatang: quote.totalPriceSatang,
+        totalDurationMinutes: quote.totalDurationMinutes,
+      });
+
+      expect(
+        await prisma.groomingBooking.count({
+          where: { groomerId },
+        }),
+      ).toBe(1);
+
+      expect(
+        await prisma.groomingBookingRequest.count({
+          where: { ownerId, requestKey: body.requestKey },
+        }),
+      ).toBe(1);
+    } finally {
+      await prisma.groomingServiceRate.update({
+        where: { id: originalRate.id },
+        data: {
+          priceSatang: originalRate.priceSatang,
+        },
+      });
+    }
+  });
+
+  it.each(['missing', 'malformed'] as const)(
+    '[TC-REQUOTE-003] rejects a %s quote hash without writing data',
+    async (kind) => {
+      const body: Record<string, unknown> = { ...bookingPayload() };
+
+      if (kind === 'missing') {
+        delete body.expectedQuoteHash;
+      } else {
+        body.expectedQuoteHash = 'invalid-hash';
+      }
+
+      await customer.post('/bookings').send(body).expect(400);
+
+      await expectNoBookings();
+
+      expect(
+        await prisma.groomingBookingRequest.count({
+          where: { ownerId },
+        }),
+      ).toBe(0);
+    },
+  );
 
   describe('ANY booking assignment', () => {
     const additionalGroomerId = randomUUID();
@@ -1248,6 +1515,7 @@ describe('Availability (e2e)', () => {
         serviceIds: body.serviceIds,
         startsAt: body.startsAt,
         requestKey: body.requestKey,
+        expectedQuoteHash: body.expectedQuoteHash,
       };
     }
 
@@ -1662,13 +1930,7 @@ describe('Availability (e2e)', () => {
   });
 
   it('[TC-BOOK-002] persists only one of two competing booking requests', async () => {
-    const body = {
-      branchId,
-      petId,
-      groomerId,
-      serviceIds: [bathId, nailId],
-      startsAt: localTime('09:00'),
-    };
+    const body = bookingPayload();
 
     const responses = await Promise.all([
       customer.post('/bookings').send({ ...body, requestKey: randomUUID() }),
@@ -1706,9 +1968,15 @@ describe('Availability (e2e)', () => {
   });
 
   it('[TC-BOOK-005] rejects assessment-required booking', async () => {
+    const rabbitQuoteHash = await quoteHashFor(ownerId, branchId, rabbitId);
+
     await customer
       .post('/bookings')
-      .send({ ...bookingPayload(), petId: rabbitId })
+      .send({
+        ...bookingPayload(),
+        petId: rabbitId,
+        expectedQuoteHash: rabbitQuoteHash,
+      })
       .expect(400);
 
     await expectNoBookings();
@@ -1926,6 +2194,7 @@ describe('Availability (e2e)', () => {
       .send({
         ...bookingPayload(),
         branchId: otherBranchId,
+        expectedQuoteHash: await quoteHashFor(ownerId, otherBranchId),
       })
       .expect(201);
 

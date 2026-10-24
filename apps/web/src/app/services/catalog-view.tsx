@@ -13,6 +13,7 @@ import {
 import { isQuotePets, type QuotePet } from './quote-types';
 import QuoteBuilder from './quote-builder';
 import { BookingFlowProvider, useBookingFlow } from './booking-flow';
+import BookingRecovery from './booking-recovery';
 
 type LoadState<T> =
   | { status: 'loading' }
@@ -110,7 +111,9 @@ export default function CatalogView() {
   return (
     <Suspense fallback={<p role="status">กำลังโหลดบริการ…</p>}>
       <BookingFlowProvider>
-        <CatalogContent />
+        <BookingRecovery>
+          <CatalogContent />
+        </BookingRecovery>
       </BookingFlowProvider>
     </Suspense>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { AvailabilitySlot } from './availability-types';
-import type { ServiceQuote } from './quote-types';
+import { isServiceQuote, type ServiceQuote } from './quote-types';
 import { useBookingFlow } from './booking-flow';
 
 type BookingStatus = 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
@@ -27,6 +27,7 @@ type BookingPayload = {
   startsAt: string;
   serviceIds: string[];
   requestKey: string;
+  expectedQuoteHash: string;
 };
 
 type SavedAttempt = {
@@ -85,7 +86,7 @@ function isBookingStatus(value: unknown): value is BookingStatus {
   );
 }
 
-function isSavedAttempt(value: unknown): value is SavedAttempt {
+export function isSavedAttempt(value: unknown): value is SavedAttempt {
   if (
     !isRecord(value) ||
     typeof value.ownerId !== 'string' ||
@@ -102,6 +103,8 @@ function isSavedAttempt(value: unknown): value is SavedAttempt {
     (payload.groomerId === undefined ||
       typeof payload.groomerId === 'string') &&
     isDateTime(payload.startsAt) &&
+    typeof payload.expectedQuoteHash === 'string' &&
+    /^[0-9a-f]{64}$/.test(payload.expectedQuoteHash) &&
     typeof payload.requestKey === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       payload.requestKey,
@@ -112,7 +115,7 @@ function isSavedAttempt(value: unknown): value is SavedAttempt {
   );
 }
 
-function readReceipt(
+export function readReceipt(
   value: unknown,
   payload: BookingPayload,
 ): BookingReceipt | null {
@@ -198,6 +201,7 @@ export default function BookingConfirmation({
   const [state, setState] = useState<State>('idle');
   const [message, setMessage] = useState('');
   const [receipt, setReceipt] = useState<BookingReceipt | null>(null);
+  const [changedQuote, setChangedQuote] = useState<ServiceQuote | null>(null);
   const requestRef = useRef<AbortController | null>(null);
   const attemptRef = useRef<SavedAttempt | null>(null);
 
@@ -343,6 +347,7 @@ export default function BookingConfirmation({
             payload: {
               ...details,
               requestKey: crypto.randomUUID(),
+              expectedQuoteHash: quote.quoteHash,
             },
           };
         }
@@ -383,6 +388,31 @@ export default function BookingConfirmation({
         if (response.status === 409) {
           const errorBody: unknown = await response.json();
 
+          if (isRecord(errorBody) && errorBody.code === 'QUOTE_CHANGED') {
+            const latestQuote = errorBody.quote;
+
+            if (
+              !isServiceQuote(latestQuote) ||
+              latestQuote.branch.id !== attempt.payload.branchId ||
+              latestQuote.pet.id !== attempt.payload.petId ||
+              latestQuote.items.length !== attempt.payload.serviceIds.length ||
+              !latestQuote.items.every((item) =>
+                attempt.payload.serviceIds.includes(item.serviceId),
+              )
+            ) {
+              throw new Error('Invalid changed quote response');
+            }
+
+            // The server rejected this attempt without creating a booking.
+            clearAttempt();
+            attemptRef.current = null;
+            setChangedQuote(latestQuote);
+            changeState('rejected');
+            setMessage(
+              'ข้อมูลราคาหรือรายละเอียดบริการเปลี่ยนแปลง ยังไม่ได้สร้างการจอง กรุณาตรวจสอบข้อมูลล่าสุดด้านล่าง แล้วโหลดข้อมูลเพื่อเลือกเวลาและยืนยันใหม่',
+            );
+            return;
+          }
           if (
             isRecord(errorBody) &&
             errorBody.code === 'BOOKING_REQUEST_REUSED'
@@ -530,6 +560,57 @@ export default function BookingConfirmation({
         <p role="alert" className="mt-3 text-sm text-danger">
           {message}
         </p>
+      )}
+
+      {changedQuote && (
+        <section
+          aria-labelledby="changed-quote-heading"
+          className="mt-5 rounded-2xl border border-primary bg-surface-soft p-5"
+        >
+          <h4 id="changed-quote-heading" className="text-lg font-bold">
+            ข้อมูลบริการล่าสุด
+          </h4>
+
+          <p className="mt-2 text-sm text-muted">
+            {changedQuote.pet.name} · {changedQuote.branch.name}
+          </p>
+
+          <ul className="mt-4 space-y-3">
+            {changedQuote.items.map((item) => (
+              <li
+                key={item.serviceId}
+                className="flex flex-wrap justify-between gap-2 text-sm"
+              >
+                <span>{item.name}</span>
+                <span>
+                  {priceFormatter.format(item.priceSatang / 100)}
+                  {' · '}
+                  {item.durationMinutes} นาที
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <p className="mt-4 border-t border-border pt-4 font-semibold">
+            รวม {priceFormatter.format(changedQuote.totalPriceSatang / 100)}
+            {' · '}
+            {changedQuote.totalDurationMinutes} นาที
+          </p>
+
+          <p className="mt-3 text-sm text-muted">
+            {changedQuote.requiresAssessment
+              ? 'บริการนี้ต้องให้เจ้าหน้าที่ประเมินก่อน กรุณาติดต่อสาขา'
+              : 'กรุณาค้นหาเวลาใหม่ เพราะระยะเวลาบริการหรือเวลาว่างอาจเปลี่ยนแปลง'}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-4 min-h-12 rounded-xl border border-primary bg-surface px-5 py-3 font-semibold text-primary hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            โหลดข้อมูลเพื่อเลือกรายการใหม่
+          </button>
+        </section>
       )}
 
       {state === 'expired' && (

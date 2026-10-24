@@ -211,6 +211,14 @@ export class BookingsService {
             ...(requestedGroomerId ? { groomerId: requestedGroomerId } : {}),
           },
         );
+        if (dto.expectedQuoteHash !== availability.quote.quoteHash) {
+          throw new ConflictException({
+            code: 'QUOTE_CHANGED',
+            message:
+              'The quote has changed; review the latest details before confirming again',
+            quote: availability.quote,
+          });
+        }
 
         if (availability.reason === 'ASSESSMENT_REQUIRED') {
           throw new BadRequestException(
