@@ -6,6 +6,7 @@ import { ListBookingsDto } from './dto/list-bookings.dto';
 const bookingSelect = {
   id: true,
   status: true,
+  paymentStatus: true,
   petId: true,
   petName: true,
   petSpecies: true,
