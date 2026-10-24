@@ -13,6 +13,7 @@ import { QuotesModule } from './quotes/quotes.module';
 import { GroomerSchedulesModule } from './groomer-schedules/groomer-schedules.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { BookingsModule } from './bookings/bookings.module';
+import { BranchClosuresModule } from './branch-closures/branch-closures.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { BookingsModule } from './bookings/bookings.module';
     GroomerSchedulesModule,
     AvailabilityModule,
     BookingsModule,
+    BranchClosuresModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -499,6 +499,41 @@ The existing pg concurrent-query deprecation warning remains unresolved.
 Scope: read-only manager and groomer endpoints.
 Staff UI and booking status updates are separate work.
 
+## Branch closures and cross-branch availability refresh
+
+| Test ID        | Coverage                                                                         | Test file                   |
+| -------------- | -------------------------------------------------------------------------------- | --------------------------- |
+| TC-CLOSURE-001 | Creating and deleting a closure refreshes availability                           | availability.e2e-spec.ts    |
+| TC-CLOSURE-002 | Buffer conflicts preserve closure data and branch version                        | availability.e2e-spec.ts    |
+| TC-CLOSURE-003 | Adjacent closure boundaries and version increments                               | availability.e2e-spec.ts    |
+| TC-CLOSURE-004 | Conflicting booking and closure requests cannot both succeed                     | availability.e2e-spec.ts    |
+| TC-CLOSURE-005 | Full-day closure creation, listing, deletion and repeated deletion               | branch-bookings.e2e-spec.ts |
+| TC-CLOSURE-006 | Closure listings and deletion are isolated by branch                             | branch-bookings.e2e-spec.ts |
+| TC-CLOSURE-007 | All closure endpoints require authentication                                     | branch-bookings.e2e-spec.ts |
+| TC-CLOSURE-008 | Customers, groomers, payment-only accounts and another branch manager are denied | branch-bookings.e2e-spec.ts |
+| TC-CLOSURE-009 | Invalid input writes no closure and preserves branch version                     | branch-bookings.e2e-spec.ts |
+| TC-CLOSURE-010 | Malformed IDs are rejected                                                       | branch-bookings.e2e-spec.ts |
+| TC-AVL-017     | Creating and deleting groomer time off refreshes searches in both branches       | availability.e2e-spec.ts    |
+
+### Verification — 2026-10-24
+
+Developer executed locally on Windows:
+
+- API and web lint passed.
+- API unit tests: 12 passed across 2 suites.
+- Full API E2E suite: 220 passed across 10 suites.
+- API and web production builds passed.
+- `git diff --check` passed.
+- Availability E2E file: 64 tests passed.
+- Branch bookings E2E file: 34 tests passed.
+- Manual Postman checks passed for closure access control,
+  service conflicts, buffer conflicts, adjacent boundaries and deletion.
+
+The file totals include existing tests, not only closure tests.
+Cross-branch refresh coverage checks fresh API searches after mutations;
+it does not imply that an already-open browser refreshes automatically.
+The existing pg concurrent-query deprecation warning remains unresolved.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.

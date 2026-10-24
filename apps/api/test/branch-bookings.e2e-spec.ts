@@ -313,6 +313,10 @@ describe('Branch bookings (e2e)', () => {
 
   beforeEach(async () => {
     await prisma.$transaction(async (tx) => {
+      await tx.branchClosure.deleteMany({
+        where: { branchId: { in: branchIds } },
+      });
+
       await tx.user.updateMany({
         where: { id: { in: userIds } },
         data: { active: true },
@@ -335,23 +339,43 @@ describe('Branch bookings (e2e)', () => {
       if (prisma) {
         await prisma.$transaction(async (tx) => {
           await tx.groomingBookingRequest.deleteMany({
-            where: { booking: { branchId: { in: branchIds } } },
+            where: {
+              booking: {
+                branchId: { in: branchIds },
+              },
+            },
           });
 
           await tx.groomingBookingItem.deleteMany({
-            where: { booking: { branchId: { in: branchIds } } },
+            where: {
+              booking: {
+                branchId: { in: branchIds },
+              },
+            },
           });
 
           await tx.groomingBooking.deleteMany({
-            where: { branchId: { in: branchIds } },
+            where: {
+              branchId: { in: branchIds },
+            },
+          });
+
+          await tx.branchClosure.deleteMany({
+            where: {
+              branchId: { in: branchIds },
+            },
           });
 
           await tx.permissionGrant.deleteMany({
-            where: { userId: { in: userIds } },
+            where: {
+              userId: { in: userIds },
+            },
           });
 
           await tx.staffAssignment.deleteMany({
-            where: { userId: { in: userIds } },
+            where: {
+              userId: { in: userIds },
+            },
           });
 
           await tx.pet.deleteMany({
@@ -370,11 +394,15 @@ describe('Branch bookings (e2e)', () => {
           }
 
           await tx.user.deleteMany({
-            where: { id: { in: userIds } },
+            where: {
+              id: { in: userIds },
+            },
           });
 
           await tx.branch.deleteMany({
-            where: { id: { in: branchIds } },
+            where: {
+              id: { in: branchIds },
+            },
           });
         });
       }
@@ -382,6 +410,218 @@ describe('Branch bookings (e2e)', () => {
       if (app) await app.close();
     }
   }, 30_000);
+
+  it('[TC-CLOSURE-005] creates, lists and deletes a full-day closure over HTTP', async () => {
+    const path = `/branches/${branchId}/closures`;
+
+    const before = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    const created = await agent(managerId)
+      .post(path)
+      .send({
+        startsAt: '2030-01-17T00:00:00+07:00',
+        endsAt: '2030-01-18T00:00:00+07:00',
+        reason: '  Full-day test  ',
+      })
+      .expect(201)
+      .expect('Cache-Control', 'no-store');
+
+    const closure = readRecord(created.body as unknown);
+
+    if (typeof closure.id !== 'string') {
+      throw new Error('Expected closure ID');
+    }
+
+    expect(closure).toMatchObject({
+      startsAt: '2030-01-16T17:00:00.000Z',
+      endsAt: '2030-01-17T17:00:00.000Z',
+      reason: 'Full-day test',
+    });
+
+    const listed = await agent(managerId)
+      .get(path)
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+
+    expect(listed.body as unknown).toEqual([
+      expect.objectContaining({ id: closure.id }),
+    ]);
+
+    const afterCreate = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    expect(afterCreate.scheduleVersion).toBe(before.scheduleVersion + 1);
+
+    await agent(managerId)
+      .delete(`${path}/${closure.id}`)
+      .expect(204)
+      .expect('Cache-Control', 'no-store');
+
+    const afterDelete = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    expect(afterDelete.scheduleVersion).toBe(before.scheduleVersion + 2);
+
+    const empty = await agent(managerId).get(path).expect(200);
+    expect(empty.body as unknown).toEqual([]);
+
+    await agent(managerId).delete(`${path}/${closure.id}`).expect(404);
+
+    const afterRepeatedDelete = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    expect(afterRepeatedDelete.scheduleVersion).toBe(
+      afterDelete.scheduleVersion,
+    );
+  });
+
+  it('[TC-CLOSURE-006] isolates closure listings and deletion by branch', async () => {
+    const created = await agent(managerId)
+      .post(`/branches/${branchId}/closures`)
+      .send({
+        startsAt: '2030-01-17T09:00:00+07:00',
+        endsAt: '2030-01-17T10:00:00+07:00',
+      })
+      .expect(201);
+
+    const closure = readRecord(created.body as unknown);
+
+    if (typeof closure.id !== 'string') {
+      throw new Error('Expected closure ID');
+    }
+
+    const otherList = await agent(otherManagerId)
+      .get(`/branches/${otherBranchId}/closures`)
+      .expect(200);
+
+    expect(otherList.body as unknown).toEqual([]);
+
+    await agent(otherManagerId)
+      .delete(`/branches/${otherBranchId}/closures/${closure.id}`)
+      .expect(404);
+
+    expect(
+      await prisma.branchClosure.count({
+        where: { id: closure.id, branchId },
+      }),
+    ).toBe(1);
+  });
+
+  it('[TC-CLOSURE-007] requires authentication for every closure endpoint', async () => {
+    const path = `/branches/${branchId}/closures`;
+    const closureId = randomUUID();
+
+    await request(app.getHttpServer()).get(path).expect(401);
+
+    await request(app.getHttpServer())
+      .post(path)
+      .send({
+        startsAt: '2030-01-17T09:00:00+07:00',
+        endsAt: '2030-01-17T10:00:00+07:00',
+      })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .delete(`${path}/${closureId}`)
+      .expect(401);
+  });
+
+  it('[TC-CLOSURE-008] denies customers, groomers, payment-only accounts and another branch manager', async () => {
+    const path = `/branches/${branchId}/closures`;
+
+    const closure = await prisma.branchClosure.create({
+      data: {
+        branchId,
+        startsAt: new Date('2030-01-17T09:00:00+07:00'),
+        endsAt: new Date('2030-01-17T10:00:00+07:00'),
+      },
+    });
+
+    for (const userId of [ownerId, groomerId, cashierId, otherManagerId]) {
+      await agent(userId).get(path).expect(403);
+
+      await agent(userId)
+        .post(path)
+        .send({
+          startsAt: '2030-01-17T11:00:00+07:00',
+          endsAt: '2030-01-17T12:00:00+07:00',
+        })
+        .expect(403);
+
+      await agent(userId).delete(`${path}/${closure.id}`).expect(403);
+    }
+
+    expect(await prisma.branchClosure.count({ where: { branchId } })).toBe(1);
+  });
+
+  it.each([
+    {},
+    {
+      startsAt: '2030-01-17T09:00:00+07:00',
+      endsAt: '2030-01-17T09:00:00+07:00',
+    },
+    {
+      startsAt: '2030-01-17T10:00:00+07:00',
+      endsAt: '2030-01-17T09:00:00+07:00',
+    },
+    {
+      startsAt: '2030-01-17T09:00:00',
+      endsAt: '2030-01-17T10:00:00',
+    },
+    {
+      startsAt: '2030-02-30T09:00:00+07:00',
+      endsAt: '2030-02-30T10:00:00+07:00',
+    },
+    {
+      startsAt: '2030-01-17T09:00:00+07:00',
+      endsAt: '2030-01-17T10:00:00+07:00',
+      reason: 123,
+    },
+    {
+      startsAt: '2030-01-17T09:00:00+07:00',
+      endsAt: '2030-01-17T10:00:00+07:00',
+      reason: 'x'.repeat(501),
+    },
+  ])(
+    '[TC-CLOSURE-009] rejects invalid closure input %j without writes',
+    async (body) => {
+      const before = await prisma.branch.findUniqueOrThrow({
+        where: { id: branchId },
+        select: { scheduleVersion: true },
+      });
+
+      await agent(managerId)
+        .post(`/branches/${branchId}/closures`)
+        .send(body)
+        .expect(400);
+
+      expect(await prisma.branchClosure.count({ where: { branchId } })).toBe(0);
+
+      const after = await prisma.branch.findUniqueOrThrow({
+        where: { id: branchId },
+        select: { scheduleVersion: true },
+      });
+
+      expect(after.scheduleVersion).toBe(before.scheduleVersion);
+    },
+  );
+
+  it('[TC-CLOSURE-010] rejects malformed IDs', async () => {
+    await agent(managerId).get('/branches/invalid/closures').expect(400);
+
+    await agent(managerId)
+      .delete(`/branches/${branchId}/closures/invalid`)
+      .expect(400);
+  });
 
   it('[TC-BRBOOK-001] lists only the requested branch in ascending appointment order', async () => {
     const response = await agent(managerId)
