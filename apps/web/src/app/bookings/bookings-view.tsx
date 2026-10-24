@@ -5,6 +5,7 @@ import Link from 'next/link';
 import CancelBooking from './cancel-booking';
 import {
   bookingStatusLabels,
+  paymentStatusLabels,
   isBookingList,
   type BookingList,
 } from './booking-types';
@@ -240,6 +241,13 @@ function BookingResults({
                     {moneyFormatter.format(booking.totalPriceSatang / 100)}
                   </dd>
                 </div>
+
+                <div>
+                  <dt className="text-muted">สถานะชำระเงิน</dt>
+                  <dd className="mt-1 font-semibold">
+                    {paymentStatusLabels[booking.paymentStatus]}
+                  </dd>
+                </div>
               </dl>
 
               <details className="mt-5 border-t border-border pt-4">
@@ -276,9 +284,11 @@ function BookingResults({
 
               {booking.status === 'CONFIRMED' && (
                 <>
-                  <p className="mt-4 text-sm text-muted">
-                    ชำระค่าบริการที่สาขา
-                  </p>
+                  {booking.paymentStatus === 'UNPAID' && (
+                    <p className="mt-4 text-sm text-muted">
+                      ชำระค่าบริการที่สาขา
+                    </p>
+                  )}
 
                   <CancelBooking
                     bookingId={booking.id}

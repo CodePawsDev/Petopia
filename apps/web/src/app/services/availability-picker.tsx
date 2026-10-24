@@ -28,7 +28,7 @@ const reasonMessages = {
 };
 
 type Selection = {
-  groomerId: string;
+  groomerId: string | undefined;
   groomerName: string;
   slot: AvailabilitySlot;
 };
@@ -133,6 +133,16 @@ export default function AvailabilityPicker({ quote }: { quote: ServiceQuote }) {
       }
     }
   }
+  const anySlots = [
+    ...new Map(
+      (result?.groomers ?? []).flatMap((groomer) =>
+        groomer.slots.map((slot): [string, AvailabilitySlot] => [
+          slot.startsAt,
+          slot,
+        ]),
+      ),
+    ).values(),
+  ].sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
 
   return (
     <section className="mt-6 border-t border-border pt-6">
@@ -167,7 +177,7 @@ export default function AvailabilityPicker({ quote }: { quote: ServiceQuote }) {
         <button
           type="button"
           onClick={() => void search()}
-          disabled={isPending || sessionExpired}
+          disabled={bookingLocked || isPending || sessionExpired}
           className="min-h-12 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60"
         >
           {isPending ? 'กำลังค้นหา…' : 'ค้นหาเวลาว่าง'}
@@ -197,6 +207,48 @@ export default function AvailabilityPicker({ quote }: { quote: ServiceQuote }) {
 
       {result?.reason === 'AVAILABLE' && phase !== 'success' && (
         <div className="mt-6 space-y-5">
+          {anySlots.length > 0 && (
+            <fieldset className="rounded-2xl border border-primary p-4">
+              <legend className="px-2 font-semibold">ไม่ระบุช่าง</legend>
+
+              <p className="mb-4 text-sm leading-7 text-muted">
+                ระบบจะจัดช่างที่ทำบริการครบและว่างในเวลาที่เลือก
+                ให้เมื่อยืนยันจอง
+              </p>
+
+              <div className="flex flex-wrap gap-3">
+                {anySlots.map((slot) => {
+                  const checked =
+                    selected !== null &&
+                    selected.groomerId === undefined &&
+                    selected.slot.startsAt === slot.startsAt;
+
+                  return (
+                    <button
+                      key={slot.startsAt}
+                      type="button"
+                      aria-pressed={checked}
+                      disabled={bookingLocked}
+                      onClick={() =>
+                        setSelected({
+                          groomerId: undefined,
+                          groomerName: 'ไม่ระบุช่าง — ระบบจัดให้เมื่อยืนยันจอง',
+                          slot,
+                        })
+                      }
+                      className={`min-h-12 rounded-xl border px-4 py-3 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                        checked
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-surface hover:border-primary'
+                      }`}
+                    >
+                      {timeFormatter.format(new Date(slot.startsAt))}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
           {result.groomers.map((groomer) => (
             <fieldset
               key={groomer.id}
@@ -246,7 +298,7 @@ export default function AvailabilityPicker({ quote }: { quote: ServiceQuote }) {
       )}
 
       {selected && result && (
-        <div key={`${selected.groomerId}:${selected.slot.startsAt}`}>
+        <div key={`${selected.groomerId ?? 'ANY'}:${selected.slot.startsAt}`}>
           {phase !== 'success' && (
             <BookingReview
               quote={result.quote}

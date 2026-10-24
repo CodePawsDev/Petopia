@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { bookingStatusLabels } from '../../../../../bookings/booking-types';
+import {
+  bookingStatusLabels,
+  paymentStatusLabels,
+} from '../../../../../bookings/booking-types';
 import {
   isBranchBookingList,
   type BranchBookingList,
@@ -322,6 +325,14 @@ function BookingResults({
                   <dt className="text-muted">ระยะเวลาบริการ</dt>
                   <dd className="mt-1">{booking.totalDurationMinutes} นาที</dd>
                 </div>
+
+                <div>
+                  <dt className="text-muted">สถานะชำระเงิน</dt>
+                  <dd className="mt-1 font-semibold">
+                    {paymentStatusLabels[booking.paymentStatus]}
+                  </dd>
+                </div>
+
                 <div>
                   <dt className="text-muted">สิ้นสุดช่วงเผื่อเวลา</dt>
                   <dd className="mt-1">

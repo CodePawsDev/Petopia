@@ -5,15 +5,26 @@ import {
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { AvailabilityService } from '../availability/availability.service';
-import { GroomingBookingStatus, Prisma } from '../generated/prisma/client';
+import {
+  GroomingBookingStatus,
+  Prisma,
+  StaffRole,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 
 const bookingSelect = {
   id: true,
   status: true,
+  paymentStatus: true,
   branchId: true,
   groomerId: true,
+  groomer: {
+    select: {
+      id: true,
+      displayName: true,
+    },
+  },
   petId: true,
   petName: true,
   petSpecies: true,
@@ -62,24 +73,24 @@ export class BookingsService {
       );
     }
 
-    // Normalize equivalent UUIDs, timestamps and service ordering.
     const branchId = dto.branchId.toLowerCase();
     const petId = dto.petId.toLowerCase();
-    const groomerId = dto.groomerId.toLowerCase();
+    const requestedGroomerId = dto.groomerId?.toLowerCase();
     const serviceIds = dto.serviceIds.map((id) => id.toLowerCase()).sort();
+    const requestKey = dto.requestKey.toLowerCase();
 
     if (new Set(serviceIds).size !== serviceIds.length) {
       throw new BadRequestException('Duplicate services are not allowed');
     }
 
-    const requestKey = dto.requestKey.toLowerCase();
-
+    // Hash the customer's intent, not the groomer assigned by the server.
+    // Explicit-groomer requests retain the previous hash structure.
     const requestHash = createHash('sha256')
       .update(
         JSON.stringify({
           branchId,
           petId,
-          groomerId,
+          groomerId: requestedGroomerId ?? null,
           startsAt: startsAt.toISOString(),
           serviceIds,
         }),
@@ -92,62 +103,87 @@ export class BookingsService {
 
     return this.prismaService.$transaction(
       async (tx) => {
-        if (requestKey) {
-          // Serialize the same owner's request key before other locks.
-          // This also protects requests that reuse a key with another groomer.
-          const lockName = JSON.stringify([
-            'grooming-booking-request',
-            ownerId.toLowerCase(),
-            requestKey,
-          ]);
+        const lockName = JSON.stringify([
+          'grooming-booking-request',
+          ownerId.toLowerCase(),
+          requestKey,
+        ]);
 
-          await tx.$queryRaw<Array<{ locked: number }>>`
-            SELECT 1 AS "locked"
-            FROM pg_advisory_xact_lock(
-              hashtextextended(${lockName}::text, 0::bigint)
-            )
-          `;
+        await tx.$queryRaw<Array<{ locked: number }>>`
+          SELECT 1 AS "locked"
+          FROM pg_advisory_xact_lock(
+            hashtextextended(${lockName}::text, 0::bigint)
+          )
+        `;
 
-          const existing = await tx.groomingBookingRequest.findUnique({
-            where: {
-              ownerId_requestKey: {
-                ownerId,
-                requestKey,
-              },
+        const existing = await tx.groomingBookingRequest.findUnique({
+          where: {
+            ownerId_requestKey: {
+              ownerId,
+              requestKey,
             },
-            select: {
-              requestHash: true,
-              booking: {
-                select: bookingSelect,
-              },
+          },
+          select: {
+            requestHash: true,
+            booking: {
+              select: bookingSelect,
             },
-          });
+          },
+        });
 
-          if (existing) {
-            if (existing.requestHash !== requestHash) {
-              throw new ConflictException({
-                code: 'BOOKING_REQUEST_REUSED',
-                message:
-                  'This request key has already been used with different booking details',
-              });
-            }
-
-            // Return the original booking with its current status.
-            // A cancelled booking must never be recreated by retrying.
-            return {
-              ...existing.booking,
-              petWeightKg: existing.booking.petWeightKg.toNumber(),
-            };
+        if (existing) {
+          if (existing.requestHash !== requestHash) {
+            throw new ConflictException({
+              code: 'BOOKING_REQUEST_REUSED',
+              message:
+                'This request key has already been used with different booking details',
+            });
           }
+
+          // Replay does not search again or assign another groomer.
+          return {
+            ...existing.booking,
+            petWeightKg: existing.booking.petWeightKg.toNumber(),
+          };
         }
 
-        // Keep the existing lock order: groomer, branch, then pet.
-        await tx.$queryRaw`
-          SELECT "id"
-          FROM "users"
-          WHERE "id" = ${groomerId}::uuid
-          FOR UPDATE
-        `;
+        const candidateIds = requestedGroomerId
+          ? [requestedGroomerId]
+          : (
+              await tx.user.findMany({
+                where: {
+                  active: true,
+                  staffAssignments: {
+                    some: {
+                      branchId,
+                      role: StaffRole.GROOMER,
+                      active: true,
+                    },
+                  },
+                },
+                select: { id: true },
+                orderBy: { id: 'asc' },
+              })
+            ).map((candidate) => candidate.id);
+
+        // Lock candidate groomers in UUID order before branch and pet.
+        // ANY requests lock the candidate set so competing booking and
+        // schedule writes finish before availability is checked again.
+        if (candidateIds.length > 0) {
+          const ids = Prisma.join(
+            candidateIds.map((id) => Prisma.sql`${id}::uuid`),
+          );
+
+          await tx.$queryRaw<Array<{ id: string }>>(
+            Prisma.sql`
+              SELECT "id"
+              FROM "users"
+              WHERE "id" IN (${ids})
+              ORDER BY "id" ASC
+              FOR UPDATE
+            `,
+          );
+        }
 
         await tx.$queryRaw`
           SELECT "id"
@@ -171,8 +207,8 @@ export class BookingsService {
             branchId,
             petId,
             serviceIds,
-            groomerId,
             date,
+            ...(requestedGroomerId ? { groomerId: requestedGroomerId } : {}),
           },
         );
 
@@ -182,15 +218,25 @@ export class BookingsService {
           );
         }
 
-        const groomer = availability.groomers.find(
-          (candidate) => candidate.id === groomerId,
+        const lockedIds = new Set(candidateIds);
+
+        // Use a stable candidate order. An unavailable candidate is skipped.
+        // Only candidates locked by this transaction may be assigned.
+        const candidates = availability.groomers
+          .filter((candidate) => lockedIds.has(candidate.id))
+          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+        const groomer = candidates.find((candidate) =>
+          candidate.slots.some(
+            (slot) => slot.startsAt.getTime() === startsAt.getTime(),
+          ),
         );
 
         const slot = groomer?.slots.find(
           (candidate) => candidate.startsAt.getTime() === startsAt.getTime(),
         );
 
-        if (!slot) {
+        if (!groomer || !slot) {
           throw new ConflictException(
             'Selected appointment time is unavailable; search again',
           );
@@ -203,7 +249,7 @@ export class BookingsService {
             ownerId,
             petId: quote.pet.id,
             branchId: quote.branch.id,
-            groomerId,
+            groomerId: groomer.id,
             status: GroomingBookingStatus.CONFIRMED,
             startsAt: slot.startsAt,
             serviceEndsAt: slot.serviceEndsAt,
@@ -232,16 +278,14 @@ export class BookingsService {
           select: bookingSelect,
         });
 
-        if (requestKey) {
-          await tx.groomingBookingRequest.create({
-            data: {
-              ownerId,
-              requestKey,
-              requestHash,
-              bookingId: booking.id,
-            },
-          });
-        }
+        await tx.groomingBookingRequest.create({
+          data: {
+            ownerId,
+            requestKey,
+            requestHash,
+            bookingId: booking.id,
+          },
+        });
 
         return {
           ...booking,

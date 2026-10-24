@@ -13,6 +13,7 @@ const BANGKOK_OFFSET_MS = 7 * 60 * 60 * 1000;
 const branchBookingSelect = {
   id: true,
   status: true,
+  paymentStatus: true,
   petId: true,
   petName: true,
   petSpecies: true,

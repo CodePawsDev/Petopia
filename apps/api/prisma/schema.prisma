@@ -273,6 +273,11 @@ enum GroomingBookingStatus {
   NO_SHOW
 }
 
+enum GroomingPaymentStatus {
+  UNPAID
+  PAID
+}
+
 model GroomingBooking {
   id                   String                @id @default(uuid()) @db.Uuid
   ownerId              String                @map("owner_id") @db.Uuid
@@ -280,6 +285,7 @@ model GroomingBooking {
   branchId             String                @map("branch_id") @db.Uuid
   groomerId            String                @map("groomer_id") @db.Uuid
   status               GroomingBookingStatus @default(CONFIRMED)
+  paymentStatus        GroomingPaymentStatus @default(UNPAID) @map("payment_status")
   startsAt             DateTime              @map("starts_at") @db.Timestamptz(3)
   serviceEndsAt        DateTime              @map("service_ends_at") @db.Timestamptz(3)
   occupiedEndsAt       DateTime              @map("occupied_ends_at") @db.Timestamptz(3)

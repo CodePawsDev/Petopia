@@ -3,6 +3,7 @@ export type BookingStatus = 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
 export type Booking = {
   id: string;
   status: BookingStatus;
+  paymentStatus: 'UNPAID' | 'PAID';
   petName: string;
   startsAt: string;
   serviceEndsAt: string;
@@ -42,6 +43,11 @@ export const bookingStatusLabels: Record<BookingStatus, string> = {
   CANCELLED: 'ยกเลิกแล้ว',
   NO_SHOW: 'ไม่มาตามนัด',
 };
+
+export const paymentStatusLabels = {
+  UNPAID: 'ยังไม่ชำระ',
+  PAID: 'ชำระแล้ว',
+} satisfies Record<Booking['paymentStatus'], string>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -85,6 +91,7 @@ export function isBooking(value: unknown): value is Booking {
     !isRecord(value) ||
     typeof value.id !== 'string' ||
     !isBookingStatus(value.status) ||
+    (value.paymentStatus !== 'UNPAID' && value.paymentStatus !== 'PAID') ||
     typeof value.petName !== 'string' ||
     !isDateTime(value.startsAt) ||
     !isDateTime(value.serviceEndsAt) ||

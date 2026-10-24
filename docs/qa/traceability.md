@@ -620,6 +620,51 @@ Developer executed locally on Windows:
 The automated test totals cover the API. UI behavior was checked manually.
 The existing pg concurrent-query deprecation warning remains unresolved.
 
+## ANY booking assignment and initial payment status
+
+Automated tests: `apps/api/test/availability.e2e-spec.ts`
+
+| Test ID     | Coverage                                                                         |
+| ----------- | -------------------------------------------------------------------------------- |
+| TC-ANY-001  | ANY assigns a real groomer before committing the booking                         |
+| TC-ANY-002  | ANY selects the next available groomer after the first is booked                 |
+| TC-ANY-003  | Explicit-groomer requests do not switch to another groomer                       |
+| TC-ANY-004  | No available groomer returns 409 without storing the request                     |
+| TC-ANY-005  | ANY replay returns the original booking; changing to explicit intent returns 409 |
+| TC-ANY-006  | Concurrent ANY requests with the same key create one booking                     |
+| TC-ANY-007  | Different keys competing for the last available groomer produce one success      |
+| TC-BOOK-001 | A new booking is CONFIRMED and UNPAID in the response and database               |
+| TC-BOOK-013 | Client-supplied payment status is rejected without writes                        |
+
+### Manual browser checks — 2026-10-24
+
+- [x] ANY request omits groomerId and includes requestKey.
+- [x] Successful ANY response contains the assigned groomer.
+- [x] Simulated response loss followed by retry preserves the request key,
+      booking ID, assigned groomer and createdAt.
+- [x] Customer booking list displays the unpaid status.
+- [x] Manager and groomer appointment lists display the unpaid status.
+
+### Verification — 2026-10-24
+
+Developer executed locally on Windows:
+
+- API and web lint passed.
+- Availability E2E file: 73 tests passed.
+- API and web production builds passed.
+
+The file total includes existing tests, not only ANY and payment tests.
+
+- Full API unit suite: 12 tests passed across 2 suites.
+- Full API E2E suite: 233 tests passed across 10 suites.
+- `git diff --check` passed.
+
+These regression totals cover the entire API.
+The existing pg concurrent-query deprecation warning remains unresolved.
+
+Scope: initial payment status and its display. Payment collection is
+separate work; this change does not provide an API to mark bookings paid.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.

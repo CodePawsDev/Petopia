@@ -11,7 +11,10 @@ type BookingStatus = 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
 type BookingReceipt = {
   id: string;
   status: BookingStatus;
+  paymentStatus: 'UNPAID' | 'PAID';
   petName: string;
+  groomerId: string;
+  groomerName: string;
   startsAt: string;
   serviceEndsAt: string;
   totalPriceSatang: number;
@@ -20,7 +23,7 @@ type BookingReceipt = {
 type BookingPayload = {
   branchId: string;
   petId: string;
-  groomerId: string;
+  groomerId?: string;
   startsAt: string;
   serviceIds: string[];
   requestKey: string;
@@ -96,7 +99,8 @@ function isSavedAttempt(value: unknown): value is SavedAttempt {
   return (
     typeof payload.branchId === 'string' &&
     typeof payload.petId === 'string' &&
-    typeof payload.groomerId === 'string' &&
+    (payload.groomerId === undefined ||
+      typeof payload.groomerId === 'string') &&
     isDateTime(payload.startsAt) &&
     typeof payload.requestKey === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -117,9 +121,16 @@ function readReceipt(
     typeof value.id !== 'string' ||
     value.id.length === 0 ||
     !isBookingStatus(value.status) ||
+    (value.paymentStatus !== 'UNPAID' && value.paymentStatus !== 'PAID') ||
     value.branchId !== payload.branchId ||
     value.petId !== payload.petId ||
-    value.groomerId !== payload.groomerId ||
+    typeof value.groomerId !== 'string' ||
+    value.groomerId.length === 0 ||
+    (payload.groomerId !== undefined &&
+      value.groomerId !== payload.groomerId) ||
+    !isRecord(value.groomer) ||
+    value.groomer.id !== value.groomerId ||
+    typeof value.groomer.displayName !== 'string' ||
     typeof value.petName !== 'string' ||
     !isDateTime(value.startsAt) ||
     !isDateTime(value.serviceEndsAt) ||
@@ -163,7 +174,10 @@ function readReceipt(
   return {
     id: value.id,
     status: value.status,
+    paymentStatus: value.paymentStatus,
     petName: value.petName,
+    groomerId: value.groomerId,
+    groomerName: value.groomer.displayName,
     startsAt: value.startsAt,
     serviceEndsAt: value.serviceEndsAt,
     totalPriceSatang: value.totalPriceSatang,
@@ -173,11 +187,10 @@ function readReceipt(
 export default function BookingConfirmation({
   quote,
   groomerId,
-  groomerName,
   slot,
 }: {
   quote: ServiceQuote;
-  groomerId: string;
+  groomerId: string | undefined;
   groomerName: string;
   slot: AvailabilitySlot;
 }) {
@@ -455,7 +468,7 @@ export default function BookingConfirmation({
 
           <div>
             <dt className="text-muted">ช่างผู้ให้บริการ</dt>
-            <dd className="mt-1">{groomerName}</dd>
+            <dd className="mt-1">{receipt.groomerName}</dd>
           </div>
 
           <div>
@@ -470,13 +483,16 @@ export default function BookingConfirmation({
           </div>
 
           <div>
-            <dt className="text-muted">
-              {receipt.status === 'CONFIRMED'
-                ? 'ยอดชำระที่สาขา'
-                : 'ราคารวมของรายการเดิม'}
-            </dt>
+            <dt className="text-muted">ยอดรวมตามรายการจอง</dt>
+
             <dd className="mt-1 text-lg font-bold text-primary">
               {priceFormatter.format(receipt.totalPriceSatang / 100)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted">สถานะชำระเงิน</dt>
+            <dd className="mt-1 font-semibold">
+              {receipt.paymentStatus === 'PAID' ? 'ชำระแล้ว' : 'ยังไม่ชำระ'}
             </dd>
           </div>
         </dl>
