@@ -25,6 +25,7 @@ model User {
   groomerServiceSkills     GroomerServiceSkill[]
   ownedGroomingBookings    GroomingBooking[]        @relation("GroomingBookingOwner")
   assignedGroomingBookings GroomingBooking[]        @relation("GroomingBookingGroomer")
+  groomingBookingRequests  GroomingBookingRequest[]
 
   @@map("users")
 }
@@ -293,11 +294,12 @@ model GroomingBooking {
   createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  owner   User                  @relation("GroomingBookingOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  groomer User                  @relation("GroomingBookingGroomer", fields: [groomerId], references: [id], onDelete: Restrict)
-  pet     Pet                   @relation(fields: [petId], references: [id], onDelete: Restrict)
-  branch  Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  owner   User                    @relation("GroomingBookingOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  groomer User                    @relation("GroomingBookingGroomer", fields: [groomerId], references: [id], onDelete: Restrict)
+  pet     Pet                     @relation(fields: [petId], references: [id], onDelete: Restrict)
+  branch  Branch                  @relation(fields: [branchId], references: [id], onDelete: Restrict)
   items   GroomingBookingItem[]
+  request GroomingBookingRequest?
 
   @@index([ownerId, startsAt])
   @@index([petId, startsAt])
@@ -327,4 +329,18 @@ model GroomingBookingItem {
   @@index([serviceId])
   @@index([rateId])
   @@map("grooming_booking_items")
+}
+
+model GroomingBookingRequest {
+  ownerId     String   @map("owner_id") @db.Uuid
+  requestKey  String   @map("request_key") @db.Uuid
+  requestHash String   @map("request_hash") @db.VarChar(64)
+  bookingId   String   @unique @map("booking_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  owner   User            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  booking GroomingBooking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@id([ownerId, requestKey])
+  @@map("grooming_booking_requests")
 }

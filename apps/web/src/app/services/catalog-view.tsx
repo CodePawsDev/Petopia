@@ -12,6 +12,7 @@ import {
 } from './catalog-types';
 import { isQuotePets, type QuotePet } from './quote-types';
 import QuoteBuilder from './quote-builder';
+import { BookingFlowProvider, useBookingFlow } from './booking-flow';
 
 type LoadState<T> =
   | { status: 'loading' }
@@ -22,10 +23,7 @@ type LoadState<T> =
 const buttonClassName =
   'min-h-12 rounded-xl border border-primary px-5 py-3 font-medium text-primary hover:bg-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
-function useApiData<T>(
-  url: string,
-  validate: (value: unknown) => value is T,
-) {
+function useApiData<T>(url: string, validate: (value: unknown) => value is T) {
   const [state, setState] = useState<LoadState<T>>({
     status: 'loading',
   });
@@ -111,12 +109,15 @@ function RetryMessage({
 export default function CatalogView() {
   return (
     <Suspense fallback={<p role="status">กำลังโหลดบริการ…</p>}>
-      <CatalogContent />
+      <BookingFlowProvider>
+        <CatalogContent />
+      </BookingFlowProvider>
     </Suspense>
   );
 }
 
 function CatalogContent() {
+  const { phase } = useBookingFlow();
   const searchParams = useSearchParams();
   const branches = useApiData('/api/catalog/branches', isBranchOptions);
   const pets = useApiData('/api/pets', isQuotePets);
@@ -170,18 +171,15 @@ function CatalogContent() {
       Number(trimmedWeight) <= 0);
 
   const guestWeight =
-    trimmedWeight === '' || hasWeightError
-      ? null
-      : Number(trimmedWeight);
+    trimmedWeight === '' || hasWeightError ? null : Number(trimmedWeight);
 
   const displayedSpecies = selectedPet?.species ?? species;
-  const displayedWeight = selectedPet
-    ? selectedPet.weightKg
-    : guestWeight;
+  const displayedWeight = selectedPet ? selectedPet.weightKg : guestWeight;
 
   return (
     <div className="space-y-8">
       <section
+        inert={phase !== 'idle'}
         aria-labelledby="catalog-filter-heading"
         className="rounded-3xl border border-border bg-surface p-6 sm:p-8"
       >
@@ -190,10 +188,7 @@ function CatalogContent() {
         </h2>
 
         <div className="mt-6">
-          <label
-            htmlFor="catalog-branch"
-            className="mb-2 block font-medium"
-          >
+          <label htmlFor="catalog-branch" className="mb-2 block font-medium">
             สาขา
           </label>
 
@@ -230,9 +225,7 @@ function CatalogContent() {
             </p>
 
             <fieldset className="mt-5">
-              <legend className="font-medium">
-                ประเภทสัตว์เลี้ยง
-              </legend>
+              <legend className="font-medium">ประเภทสัตว์เลี้ยง</legend>
 
               <div className="mt-3 flex flex-wrap gap-3">
                 {(['DOG', 'CAT', 'RABBIT'] as const).map((option) => (
@@ -286,9 +279,7 @@ function CatalogContent() {
           </div>
         ) : activePets.length === 0 ? (
           <div className="mt-6">
-            <p className="text-muted">
-              เพิ่มสัตว์เลี้ยงก่อนเลือกบริการ
-            </p>
+            <p className="text-muted">เพิ่มสัตว์เลี้ยงก่อนเลือกบริการ</p>
             <Link
               href="/pets"
               className="mt-3 inline-block font-semibold text-primary underline underline-offset-4"
@@ -298,10 +289,7 @@ function CatalogContent() {
           </div>
         ) : (
           <div className="mt-6">
-            <label
-              htmlFor="catalog-pet"
-              className="mb-2 block font-medium"
-            >
+            <label htmlFor="catalog-pet" className="mb-2 block font-medium">
               สัตว์เลี้ยงของฉัน
             </label>
 
@@ -363,8 +351,7 @@ function CatalogContent() {
             สนใจบริการสำหรับสัตว์เลี้ยงของคุณ?
           </h2>
           <p className="mt-2 text-sm text-muted">
-            เข้าสู่ระบบเพื่อเลือกสัตว์เลี้ยง เลือกหลายบริการ
-            และคำนวณราคารวม
+            เข้าสู่ระบบเพื่อเลือกสัตว์เลี้ยง เลือกหลายบริการ และคำนวณราคารวม
           </p>
           <Link
             href="/login"
@@ -462,9 +449,7 @@ function BranchGroomers({ branchId }: { branchId: string }) {
           onRetry={groomers.retry}
         />
       ) : groomers.state.data.groomers.length === 0 ? (
-        <p className="mt-4 text-muted">
-          ยังไม่มีรายชื่อช่างในสาขานี้
-        </p>
+        <p className="mt-4 text-muted">ยังไม่มีรายชื่อช่างในสาขานี้</p>
       ) : (
         <ul className="mt-4 space-y-3">
           {groomers.state.data.groomers.map((groomer) => (

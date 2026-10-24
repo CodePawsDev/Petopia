@@ -107,6 +107,7 @@ describe('Availability (e2e)', () => {
       groomerId,
       serviceIds: [bathId, nailId],
       startsAt: localTime('09:00'),
+      requestKey: randomUUID(),
     };
   }
 
@@ -291,44 +292,57 @@ describe('Availability (e2e)', () => {
 
   beforeEach(async () => {
     await prisma.$transaction(async (tx) => {
+      await tx.groomingBookingRequest.deleteMany({
+        where: {
+          booking: { groomerId },
+        },
+      });
+
       await tx.groomingBookingItem.deleteMany({
         where: {
-          booking: {
-            groomerId,
-          },
+          booking: { groomerId },
         },
       });
 
       await tx.groomingBooking.deleteMany({
-        where: {
-          groomerId,
-        },
+        where: { groomerId },
       });
+
       await tx.groomerWorkingInterval.deleteMany({
         where: { groomerId },
       });
+
       await tx.groomerTimeOff.deleteMany({
         where: { groomerId },
       });
+
       await tx.branchClosure.deleteMany({
-        where: { branchId: { in: branchIds } },
+        where: {
+          branchId: { in: branchIds },
+        },
       });
 
       await tx.user.update({
         where: { id: groomerId },
         data: { active: true },
       });
+
       await tx.staffAssignment.updateMany({
         where: { userId: groomerId },
         data: { active: true },
       });
+
       await tx.groomerServiceSkill.updateMany({
         where: { groomerId },
         data: { active: true },
       });
+
       await tx.pet.update({
         where: { id: petId },
-        data: { archivedAt: null, weightKg: 5 },
+        data: {
+          archivedAt: null,
+          weightKg: 5,
+        },
       });
 
       await tx.groomerWorkingInterval.createMany({
@@ -356,19 +370,23 @@ describe('Availability (e2e)', () => {
     try {
       if (prisma) {
         await prisma.$transaction(async (tx) => {
+          await tx.groomingBookingRequest.deleteMany({
+            where: {
+              booking: { groomerId },
+            },
+          });
+
           await tx.groomingBookingItem.deleteMany({
             where: {
-              booking: {
-                groomerId,
-              },
+              booking: { groomerId },
             },
           });
 
           await tx.groomingBooking.deleteMany({
-            where: {
-              groomerId,
-            },
+            where: { groomerId },
           });
+
+          // คำสั่งล้างข้อมูลอื่น ๆ ด้านล่าง เก็บไว้ตามเดิม
           await tx.groomerWorkingInterval.deleteMany({
             where: { groomerId },
           });
@@ -664,16 +682,205 @@ describe('Availability (e2e)', () => {
     });
     expect(starts(response.body)).toEqual([]);
   });
+  it('[TC-IDEM-001] returns the same booking for a repeated request', async () => {
+    const body = bookingPayload();
+
+    const first = await customer.post('/bookings').send(body).expect(201);
+
+    const second = await customer.post('/bookings').send(body).expect(201);
+
+    const original = readRecord(first.body as unknown);
+    const repeated = readRecord(second.body as unknown);
+
+    expect(typeof original.id).toBe('string');
+    expect(repeated.id).toBe(original.id);
+    expect(repeated.createdAt).toBe(original.createdAt);
+
+    expect(await prisma.groomingBooking.count({ where: { groomerId } })).toBe(
+      1,
+    );
+
+    expect(
+      await prisma.groomingBookingRequest.count({
+        where: { ownerId, requestKey: body.requestKey },
+      }),
+    ).toBe(1);
+  });
+
+  it('[TC-IDEM-002] creates one booking when the same request is sent concurrently', async () => {
+    const body = bookingPayload();
+
+    const responses = await Promise.all([
+      customer.post('/bookings').send(body),
+      customer.post('/bookings').send(body),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+
+    const first = readRecord(responses[0].body as unknown);
+    const second = readRecord(responses[1].body as unknown);
+
+    expect(typeof first.id).toBe('string');
+    expect(second.id).toBe(first.id);
+
+    expect(await prisma.groomingBooking.count({ where: { groomerId } })).toBe(
+      1,
+    );
+
+    expect(
+      await prisma.groomingBookingRequest.count({
+        where: { ownerId, requestKey: body.requestKey },
+      }),
+    ).toBe(1);
+  });
+
+  it('[TC-IDEM-003] rejects the same key with different booking details', async () => {
+    const body = bookingPayload();
+
+    await customer.post('/bookings').send(body).expect(201);
+
+    const response = await customer
+      .post('/bookings')
+      .send({ ...body, serviceIds: [bathId] })
+      .expect(409);
+
+    expect(response.body as unknown).toMatchObject({
+      code: 'BOOKING_REQUEST_REUSED',
+    });
+
+    expect(await prisma.groomingBooking.count({ where: { groomerId } })).toBe(
+      1,
+    );
+  });
+
+  it('[TC-IDEM-004] recognizes equivalent timestamps and reordered services', async () => {
+    const body = bookingPayload();
+
+    const first = await customer.post('/bookings').send(body).expect(201);
+
+    const second = await customer
+      .post('/bookings')
+      .send({
+        ...body,
+        startsAt: `${date}T09:00:00+07:00`,
+        serviceIds: [...body.serviceIds].reverse(),
+      })
+      .expect(201);
+
+    expect(readRecord(second.body as unknown).id).toBe(
+      readRecord(first.body as unknown).id,
+    );
+
+    expect(await prisma.groomingBooking.count({ where: { groomerId } })).toBe(
+      1,
+    );
+  });
+
+  it('[TC-IDEM-005] returns a cancelled booking without recreating it', async () => {
+    const body = bookingPayload();
+
+    const created = await customer.post('/bookings').send(body).expect(201);
+
+    const booking = readRecord(created.body as unknown);
+
+    if (typeof booking.id !== 'string') {
+      throw new Error('Expected booking ID');
+    }
+
+    await customer.post(`/bookings/${booking.id}/cancel`).expect(200);
+
+    const repeated = await customer.post('/bookings').send(body).expect(201);
+
+    expect(repeated.body as unknown).toMatchObject({
+      id: booking.id,
+      status: 'CANCELLED',
+    });
+
+    expect(await prisma.groomingBooking.count({ where: { groomerId } })).toBe(
+      1,
+    );
+
+    // Intentionally starting a new booking uses a new request key.
+    const replacement = await customer
+      .post('/bookings')
+      .send({ ...body, requestKey: randomUUID() })
+      .expect(201);
+
+    expect(readRecord(replacement.body as unknown).id).not.toBe(booking.id);
+  });
+
+  it('[TC-IDEM-006] rejects a missing request key without writing data', async () => {
+    const body: Record<string, unknown> = { ...bookingPayload() };
+    delete body.requestKey;
+
+    await customer.post('/bookings').send(body).expect(400);
+
+    await expectNoBookings();
+
+    expect(
+      await prisma.groomingBookingRequest.count({
+        where: { ownerId },
+      }),
+    ).toBe(0);
+  });
+
+  it('[TC-IDEM-007] rolls back the request record when booking fails', async () => {
+    const body = {
+      ...bookingPayload(),
+      startsAt: localTime('12:00'),
+    };
+
+    // This time falls inside the fixture's lunch break.
+    await customer.post('/bookings').send(body).expect(409);
+
+    await expectNoBookings();
+
+    expect(
+      await prisma.groomingBookingRequest.count({
+        where: { ownerId, requestKey: body.requestKey },
+      }),
+    ).toBe(0);
+  });
+
+  it('[TC-IDEM-008] scopes request keys to the authenticated owner', async () => {
+    const body = bookingPayload();
+
+    const original = await customer.post('/bookings').send(body).expect(201);
+
+    const otherCustomer = request.agent(app.getHttpServer());
+
+    await otherCustomer
+      .post('/auth/login')
+      .send({
+        email: `availability-other-${runId}@example.com`,
+        password,
+      })
+      .expect(200);
+
+    const other = await otherCustomer
+      .post('/bookings')
+      .send({
+        ...body,
+        petId: otherPetId,
+        startsAt: localTime('13:00'),
+      })
+      .expect(201);
+
+    expect(readRecord(other.body as unknown).id).not.toBe(
+      readRecord(original.body as unknown).id,
+    );
+
+    expect(
+      await prisma.groomingBookingRequest.count({
+        where: { requestKey: body.requestKey },
+      }),
+    ).toBe(2);
+  });
+
   it('[TC-BOOK-001] creates one booking and removes its occupied interval from availability', async () => {
     const response = await customer
       .post('/bookings')
-      .send({
-        branchId,
-        petId,
-        groomerId,
-        serviceIds: [bathId, nailId],
-        startsAt: localTime('09:00'),
-      })
+      .send(bookingPayload())
       .expect(201)
       .expect('Cache-Control', 'no-store');
 
@@ -730,8 +937,8 @@ describe('Availability (e2e)', () => {
     };
 
     const responses = await Promise.all([
-      customer.post('/bookings').send(body),
-      customer.post('/bookings').send(body),
+      customer.post('/bookings').send({ ...body, requestKey: randomUUID() }),
+      customer.post('/bookings').send({ ...body, requestKey: randomUUID() }),
     ]);
 
     expect(
