@@ -224,25 +224,26 @@ Automated tests: [Quote tests](../../apps/api/test/quotes.e2e-spec.ts).
 
 ### Quote Test Case Index
 
-| Test case ID | Scenario                                                                |
-| ------------ | ----------------------------------------------------------------------- |
-| TC-QUOTE-001 | Calculate multiple services and verify exact totals and no-store header |
-| TC-QUOTE-002 | Reject requests without a session                                       |
-| TC-QUOTE-003 | Reject duplicate service IDs                                            |
-| TC-QUOTE-004 | Reject bath combined with bath and haircut                              |
-| TC-QUOTE-005 | Reject access to another customer's pet                                 |
-| TC-QUOTE-006 | Reject an archived pet                                                  |
-| TC-QUOTE-007 | Select correct rates at 5, 5.001 and 80 kg                              |
-| TC-QUOTE-008 | Reject weight above the supported range                                 |
-| TC-QUOTE-009 | Reject a pet without recorded weight                                    |
-| TC-QUOTE-010 | Reject empty service lists and malformed service IDs                    |
-| TC-QUOTE-011 | Reject client-supplied price and weight                                 |
-| TC-QUOTE-012 | Calculate rabbit services and return assessment flags                   |
-| TC-QUOTE-013 | Reject an unknown service without returning a partial quote             |
-| TC-QUOTE-014 | Reject an inactive service                                              |
-| TC-QUOTE-015 | Reject an inactive matching rate                                        |
-| TC-QUOTE-016 | Reject an inactive branch                                               |
-| TC-QUOTE-017 | Reject an inactive business unit                                        |
+| Test case ID | Scenario                                                                             |
+| ------------ | ------------------------------------------------------------------------------------ |
+| TC-QUOTE-001 | Calculate multiple services and verify exact totals and no-store header              |
+| TC-QUOTE-002 | Reject requests without a session                                                    |
+| TC-QUOTE-003 | Reject duplicate service IDs                                                         |
+| TC-QUOTE-004 | Reject bath combined with bath and haircut                                           |
+| TC-QUOTE-005 | Reject access to another customer's pet                                              |
+| TC-QUOTE-006 | Reject an archived pet                                                               |
+| TC-QUOTE-007 | Select correct rates at 5, 5.001 and 80 kg                                           |
+| TC-QUOTE-008 | Reject weight above the supported range                                              |
+| TC-QUOTE-009 | Reject a pet without recorded weight                                                 |
+| TC-QUOTE-010 | Reject empty service lists and malformed service IDs                                 |
+| TC-QUOTE-011 | Reject client-supplied price and weight                                              |
+| TC-QUOTE-012 | Calculate rabbit services and return assessment flags                                |
+| TC-QUOTE-013 | Reject an unknown service without returning a partial quote                          |
+| TC-QUOTE-014 | Reject an inactive service                                                           |
+| TC-QUOTE-015 | Reject an inactive matching rate                                                     |
+| TC-QUOTE-016 | Reject an inactive branch                                                            |
+| TC-QUOTE-017 | Reject an inactive business unit                                                     |
+| TC-QUOTE-018 | Accept CAT and RABBIT maximum weights and reject weights 0.001 kg above their limits |
 
 ## Groomer schedules and time off
 
@@ -289,24 +290,25 @@ Known limitation: in-app navigation through browser Back/Forward is not intercep
 
 ## Grooming availability
 
-| Test ID    | Coverage                                                       | Evidence                 |
-| ---------- | -------------------------------------------------------------- | ------------------------ |
-| TC-AVL-001 | Quote totals, Bangkok time, start intervals, breaks and buffer | availability.e2e-spec.ts |
-| TC-AVL-002 | Search without selecting a groomer                             | availability.e2e-spec.ts |
-| TC-AVL-003 | Cross-branch time off and buffer overlap                       | availability.e2e-spec.ts |
-| TC-AVL-004 | Branch closure overlap and adjacent boundaries                 | availability.e2e-spec.ts |
-| TC-AVL-005 | Closures are isolated by branch                                | availability.e2e-spec.ts |
-| TC-AVL-006 | Fully closed branch returns no slots                           | availability.e2e-spec.ts |
-| TC-AVL-007 | Every selected service requires an active species skill        | availability.e2e-spec.ts |
-| TC-AVL-008 | Inactive branch assignment is rejected                         | availability.e2e-spec.ts |
-| TC-AVL-009 | Inactive groomer is rejected                                   | availability.e2e-spec.ts |
-| TC-AVL-010 | Assessment-required services return no slots                   | availability.e2e-spec.ts |
-| TC-AVL-011 | Authentication is required                                     | availability.e2e-spec.ts |
-| TC-AVL-012 | Another customer's pet is inaccessible                         | availability.e2e-spec.ts |
-| TC-AVL-013 | Archived pets are rejected                                     | availability.e2e-spec.ts |
-| TC-AVL-014 | Missing stored weight is rejected                              | availability.e2e-spec.ts |
-| TC-AVL-015 | Invalid dates and malformed groomer IDs are rejected           | availability.e2e-spec.ts |
-| TC-AVL-016 | Dates beyond the booking window return no slots                | availability.e2e-spec.ts |
+| Test ID    | Coverage                                                                     | Evidence                 |
+| ---------- | ---------------------------------------------------------------------------- | ------------------------ |
+| TC-AVL-001 | Quote totals, Bangkok time, start intervals, breaks and buffer               | availability.e2e-spec.ts |
+| TC-AVL-002 | Search without selecting a groomer                                           | availability.e2e-spec.ts |
+| TC-AVL-003 | Cross-branch time off and buffer overlap                                     | availability.e2e-spec.ts |
+| TC-AVL-004 | Branch closure overlap and adjacent boundaries                               | availability.e2e-spec.ts |
+| TC-AVL-005 | Closures are isolated by branch                                              | availability.e2e-spec.ts |
+| TC-AVL-006 | Fully closed branch returns no slots                                         | availability.e2e-spec.ts |
+| TC-AVL-007 | Every selected service requires an active species skill                      | availability.e2e-spec.ts |
+| TC-AVL-008 | Inactive branch assignment is rejected                                       | availability.e2e-spec.ts |
+| TC-AVL-009 | Inactive groomer is rejected                                                 | availability.e2e-spec.ts |
+| TC-AVL-010 | Assessment-required services return no slots                                 | availability.e2e-spec.ts |
+| TC-AVL-011 | Authentication is required                                                   | availability.e2e-spec.ts |
+| TC-AVL-012 | Another customer's pet is inaccessible                                       | availability.e2e-spec.ts |
+| TC-AVL-013 | Archived pets are rejected                                                   | availability.e2e-spec.ts |
+| TC-AVL-014 | Missing stored weight is rejected                                            | availability.e2e-spec.ts |
+| TC-AVL-015 | Invalid dates and malformed groomer IDs are rejected                         | availability.e2e-spec.ts |
+| TC-AVL-016 | Dates beyond the booking window return no slots                              | availability.e2e-spec.ts |
+| TC-AVL-018 | ANY search returns multiple eligible groomers and excludes incomplete skills | availability.e2e-spec.ts |
 
 Rule-level boundary tests are in
 `apps/api/src/availability/availability-rules.spec.ts`.
@@ -532,6 +534,43 @@ Developer executed locally on Windows:
 The file totals include existing tests, not only closure tests.
 Cross-branch refresh coverage checks fresh API searches after mutations;
 it does not imply that an already-open browser refreshes automatically.
+The existing pg concurrent-query deprecation warning remains unresolved.
+
+## Availability rules review — Petopia-11
+
+Reviewed coverage for weight and time boundaries, breaks, branch
+closures, groomer skills and ANY searches.
+
+Existing coverage is mapped in the Service Catalog, Service Quotes,
+Grooming availability and Branch closures sections above.
+Exact two-hour and 30-day start boundaries, working intervals and
+buffer rules are covered in
+`apps/api/src/availability/availability-rules.spec.ts`.
+
+This review added:
+
+- TC-QUOTE-018: CAT and RABBIT maximum-weight boundaries.
+- TC-AVL-018: ANY search with multiple eligible groomers and a groomer
+  missing one selected service skill.
+
+### Verification — 2026-10-24
+
+Developer executed locally on Windows:
+
+- API lint passed.
+- Quote E2E file: 24 tests passed.
+- Availability E2E file: 65 tests passed.
+
+These file totals include existing tests, not only the review additions.
+Full-project verification completed locally on Windows:
+
+- API and web lint passed.
+- API unit tests: 12 passed across 2 suites.
+- Full API E2E suite: 225 passed across 10 suites.
+- API and web production builds passed.
+- `git diff --check` passed.
+
+The full E2E total covers the entire API, not only this review.
 The existing pg concurrent-query deprecation warning remains unresolved.
 
 ## Maintenance

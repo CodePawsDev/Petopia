@@ -735,6 +735,117 @@ describe('Availability (e2e)', () => {
     expect(starts(response.body)).toContain(localTime('09:00'));
   });
 
+  it('[TC-AVL-018] returns multiple eligible groomers and excludes one missing a selected skill in ANY search', async () => {
+    const eligibleId = randomUUID();
+    const incompleteId = randomUUID();
+    const addedGroomerIds = [eligibleId, incompleteId];
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.user.createMany({
+          data: [
+            {
+              id: eligibleId,
+              email: `availability-eligible-${eligibleId}@example.com`,
+              displayName: 'Eligible ANY Groomer',
+              passwordHash: 'unused-test-fixture',
+            },
+            {
+              id: incompleteId,
+              email: `availability-incomplete-${incompleteId}@example.com`,
+              displayName: 'Incomplete ANY Groomer',
+              passwordHash: 'unused-test-fixture',
+            },
+          ],
+        });
+
+        await tx.staffAssignment.createMany({
+          data: addedGroomerIds.map((userId) => ({
+            userId,
+            branchId,
+            role: StaffRole.GROOMER,
+          })),
+        });
+
+        await tx.groomerServiceSkill.createMany({
+          data: [
+            {
+              groomerId: eligibleId,
+              serviceId: bathId,
+              species: PetSpecies.DOG,
+            },
+            {
+              groomerId: eligibleId,
+              serviceId: nailId,
+              species: PetSpecies.DOG,
+            },
+            {
+              groomerId: incompleteId,
+              serviceId: bathId,
+              species: PetSpecies.DOG,
+            },
+          ],
+        });
+
+        await tx.groomerWorkingInterval.createMany({
+          data: addedGroomerIds.map((id) => ({
+            groomerId: id,
+            branchId,
+            weekday,
+            startMinute: 540,
+            endMinute: 720,
+          })),
+        });
+      });
+
+      const body = payload();
+
+      const response = await customer
+        .post('/availability/search')
+        .send({
+          branchId: body.branchId,
+          petId: body.petId,
+          serviceIds: body.serviceIds,
+          date: body.date,
+        })
+        .expect(200);
+
+      expect(response.body as unknown).toMatchObject({
+        reason: 'AVAILABLE',
+      });
+
+      const groomers = readGroomers(response.body);
+
+      expect(groomers.map((groomer) => groomer.id).sort()).toEqual(
+        [groomerId, eligibleId].sort(),
+      );
+
+      for (const groomer of groomers) {
+        expect(groomer.slots.map((slot) => slot.startsAt)).toContain(
+          localTime('09:00'),
+        );
+      }
+    } finally {
+      await prisma.$transaction(async (tx) => {
+        await tx.groomerWorkingInterval.deleteMany({
+          where: { groomerId: { in: addedGroomerIds } },
+        });
+
+        await tx.groomerServiceSkill.deleteMany({
+          where: { groomerId: { in: addedGroomerIds } },
+        });
+
+        await tx.staffAssignment.deleteMany({
+          where: { userId: { in: addedGroomerIds } },
+        });
+
+        await tx.user.deleteMany({
+          where: { id: { in: addedGroomerIds } },
+        });
+      });
+    }
+  });
+
   it('[TC-AVL-003] blocks time off recorded through another branch, including buffer overlap', async () => {
     await prisma.groomerTimeOff.create({
       data: {
