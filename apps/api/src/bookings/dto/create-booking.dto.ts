@@ -12,4 +12,7 @@ export class CreateBookingDto extends CreateQuoteDto {
 
   @IsUUID('4')
   requestKey!: string;
+
+  @Matches(/^[0-9a-f]{64}$/)
+  expectedQuoteHash!: string;
 }

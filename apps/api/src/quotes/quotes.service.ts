@@ -6,6 +6,7 @@ import {
 import { GroomingServiceKind, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
+import { calculateQuoteHash } from './quote-fingerprint';
 
 @Injectable()
 export class QuotesService {
@@ -153,7 +154,7 @@ export class QuotesService {
       0,
     );
 
-    return {
+    const quote = {
       branch: {
         id: branch.id,
         code: branch.code,
@@ -170,6 +171,11 @@ export class QuotesService {
       totalPriceSatang,
       totalDurationMinutes,
       requiresAssessment: items.some((item) => item.requiresAssessment),
+    };
+
+    return {
+      ...quote,
+      quoteHash: calculateQuoteHash(quote),
     };
   }
 }

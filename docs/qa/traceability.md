@@ -665,6 +665,38 @@ The existing pg concurrent-query deprecation warning remains unresolved.
 Scope: initial payment status and its display. Payment collection is
 separate work; this change does not provide an API to mark bookings paid.
 
+## Booking quote reconfirmation and reload recovery
+
+| Test ID | Scenario | Evidence |
+| --- | --- | --- |
+| TC-REQUOTE-001 | Price or duration changes require reconfirmation; rejected attempts write no booking or request record; confirming the latest quote succeeds. | API E2E: 2 cases |
+| TC-REQUOTE-002 | Retrying a successful request after catalog prices change returns the original booking and preserves its stored snapshot. | API E2E |
+| TC-REQUOTE-003 | Missing or malformed expected quote hashes are rejected without writes. | API E2E: 2 cases |
+
+### Manual browser checks
+
+- [x] Changing pet details after reviewing a quote prevents booking and displays the latest details.
+- [x] Reloading and selecting the latest details allows a deliberate new confirmation.
+- [x] After a successful booking response is lost, reloading and retrying recovers the same booking ID and assigned groomer, with one booking recorded.
+- [x] When the original booking request never reaches the server, reloading and retrying creates one booking.
+- [x] Account B does not see account A's pending request; returning to account A allows recovery.
+
+### Verification — 2026-10-24
+
+- Workspace lint passed.
+- API unit tests: 12 passed across 2 suites.
+- API E2E tests: 238 passed across 10 suites.
+- Availability E2E tests: 78 passed.
+- API and web production builds passed.
+- `git diff --check` passed before this documentation update.
+
+### Scope and known follow-up
+
+- Pending-request recovery uses sessionStorage in the same browser tab.
+- Recovery resubmits the original payload and request key only after user confirmation.
+- Quote fingerprints detect changes; prices and durations are recalculated from server-side data.
+- The pg concurrent-query deprecation warning remains a separate unresolved follow-up.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.
