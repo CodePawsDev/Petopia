@@ -391,6 +391,85 @@ describe('Service quotes (e2e)', () => {
       });
     }
   });
+  it.each([
+    {
+      species: PetSpecies.CAT,
+      weight: 15,
+      expectedStatus: 200,
+      requiresAssessment: false,
+    },
+    {
+      species: PetSpecies.CAT,
+      weight: 15.001,
+      expectedStatus: 400,
+      requiresAssessment: false,
+    },
+    {
+      species: PetSpecies.RABBIT,
+      weight: 8,
+      expectedStatus: 200,
+      requiresAssessment: true,
+    },
+    {
+      species: PetSpecies.RABBIT,
+      weight: 8.001,
+      expectedStatus: 400,
+      requiresAssessment: true,
+    },
+  ])(
+    '[TC-QUOTE-018] checks the $species weight limit at $weight kg',
+    async ({ species, weight, expectedStatus, requiresAssessment }) => {
+      try {
+        await prisma.pet.update({
+          where: { id: petId },
+          data: {
+            species,
+            weightKg: weight,
+          },
+        });
+
+        const response = await request(app.getHttpServer())
+          .post('/quotes')
+          .set('Cookie', cookie)
+          .send({
+            branchId,
+            petId,
+            serviceIds: [bathId],
+          })
+          .expect(expectedStatus);
+
+        if (expectedStatus === 200) {
+          expect(response.body as unknown).toMatchObject({
+            pet: {
+              id: petId,
+              species,
+              weightKg: weight,
+            },
+            requiresAssessment,
+            items: [
+              {
+                serviceId: bathId,
+                requiresAssessment,
+              },
+            ],
+          });
+        } else {
+          expect(response.body as unknown).toMatchObject({
+            message:
+              'A selected service has no unique rate for this pet; contact the branch for assessment',
+          });
+        }
+      } finally {
+        await prisma.pet.update({
+          where: { id: petId },
+          data: {
+            species: PetSpecies.DOG,
+            weightKg: 5,
+          },
+        });
+      }
+    },
+  );
 
   it('[TC-QUOTE-009] should reject a pet without recorded weight', async () => {
     try {
