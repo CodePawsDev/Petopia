@@ -75,9 +75,8 @@ Authorization checks are implemented in:
 The suite includes database integration tests, HTTP tests against test-only
 routes and HTTP tests against branch workspace endpoints.
 
-Account isolation and branch access are covered. Ownership checks for pets,
-bookings and other business resources will be added when those endpoints
-are implemented.
+Account isolation and branch access are covered here.
+Pet and booking ownership checks are documented in their respective sections below.
 
 | Requirement ID | Acceptance criterion                                                                                                                             | Test case IDs                                          | Coverage    |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ | ----------- |
@@ -167,13 +166,16 @@ These cases cover the API. Browser forms and browser interaction tests are track
 | TC-PET-015   | Reject malformed pet IDs                                          |
 | TC-PET-016   | Reject nonexistent pet IDs                                        |
 
-### Deferred booking integration
+### Booking integration
 
-- Prevent archived pets from being used in new bookings.
-- Preserve access to historical booking information after pet archival.
-- Define which booking statuses block archival and handle concurrent booking and archival requests.
+- Archived pets are rejected by quote calculation and availability search.
+- Historical booking snapshots remain accessible after pet profile changes
+  and archival; see TC-BOOK-READ-006.
 
-These booking rules are not implemented or covered by the current pet API tests.
+Deferred:
+
+- Define which booking statuses, if any, should block pet archival.
+- Add dedicated coverage for concurrent booking and archival requests.
 
 ## Service Catalog
 
@@ -265,7 +267,8 @@ Test file: `apps/api/test/groomer-schedules.e2e-spec.ts`
 
 The suite contains 27 tests across 14 test IDs because some cases use parameterized inputs.
 
-Scope: schedule management APIs and manager-facing schedule UI. Availability search and booking integration are not implemented yet.
+Scope: schedule management APIs and manager-facing schedule UI.
+Availability and booking integration are documented in the sections below.
 
 ### Manual browser checks
 
@@ -427,11 +430,34 @@ Executed by the developer on local Windows:
 - API E2E tests: 181 passed across 9 suites.
 - API and web production builds: passed.
 - `git diff --check`: passed.
-- Browser response-loss simulation: developer reported successful retry.
-  Confirm matching request keys and booking IDs in Network before
-  treating duplicate prevention in this browser scenario as verified.
+- Browser response-loss simulation: passed. The developer verified in
+  Network that retrying used the same requestKey and returned the same
+  booking ID.
 
 The E2E total covers the entire API suite, not idempotency tests alone.
+
+## My bookings UI
+
+Implementation:
+
+- `/bookings` lists the authenticated owner's bookings with pagination.
+- Service details include stored prices and durations.
+- Appointment times are displayed in Asia/Bangkok.
+- Cancellation requires confirmation and refreshes the list after success.
+- An uncertain cancellation can be retried against the same booking.
+
+### Manual browser checks
+
+- [x] Account navigation opens `/bookings`.
+- [x] Booking details, Thai local times and prices match the API.
+- [x] An account without bookings sees the empty state.
+- [x] Keeping a booking does not cancel it.
+- [x] Confirming cancellation updates the status; it persists after reload.
+- [x] Offline cancellation can be retried after reconnecting.
+- [x] Unauthenticated visitors see a login prompt without booking data.
+- [x] Pagination works across multiple pages when enough records exist.
+
+Executed manually by the developer on local Windows on 2026-10-24.
 
 ## Maintenance
 

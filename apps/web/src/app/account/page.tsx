@@ -304,6 +304,12 @@ export default function AccountPage() {
                   >
                     เลือกสาขาและบริการ Grooming
                   </Link>
+                  <Link
+                    href="/bookings"
+                    className="flex min-h-12 items-center rounded-xl border border-border bg-surface-soft px-4 py-3 text-left font-semibold text-primary transition-colors hover:border-primary hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    การจองของฉัน
+                  </Link>
                 </nav>
 
                 <div className="mt-5 border-t border-border pt-5">
