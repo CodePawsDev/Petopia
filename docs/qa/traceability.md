@@ -403,6 +403,36 @@ The exact start-time boundary is enforced in code but has no dedicated test yet.
 Observed warning: pg reported concurrent client.query() usage.
 The source has not yet been traced; all tests passed.
 
+## Booking request idempotency
+
+Automated coverage: `apps/api/test/availability.e2e-spec.ts`
+
+| Test ID     | Scenario                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| TC-IDEM-001 | Repeating the same request returns the same booking                                      |
+| TC-IDEM-002 | Concurrent requests with the same key create one booking                                 |
+| TC-IDEM-003 | Reusing a key with different details returns 409                                         |
+| TC-IDEM-004 | Equivalent timestamps and reordered services reuse the booking                           |
+| TC-IDEM-005 | Retrying a cancelled booking returns its current status; a new key permits a new booking |
+| TC-IDEM-006 | Missing request keys return 400 without writing data                                     |
+| TC-IDEM-007 | An unavailable slot leaves no booking or request record                                  |
+| TC-IDEM-008 | Request keys are scoped to the authenticated owner                                       |
+
+### Local verification — 2026-10-24
+
+Executed by the developer on local Windows:
+
+- API and web lint: passed.
+- API unit tests: 12 passed across 2 suites.
+- API E2E tests: 181 passed across 9 suites.
+- API and web production builds: passed.
+- `git diff --check`: passed.
+- Browser response-loss simulation: developer reported successful retry.
+  Confirm matching request keys and booking IDs in Network before
+  treating duplicate prevention in this browser scenario as verified.
+
+The E2E total covers the entire API suite, not idempotency tests alone.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.

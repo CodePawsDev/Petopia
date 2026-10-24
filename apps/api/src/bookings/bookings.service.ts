@@ -3,10 +3,43 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { AvailabilityService } from '../availability/availability.service';
 import { GroomingBookingStatus, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+
+const bookingSelect = {
+  id: true,
+  status: true,
+  branchId: true,
+  groomerId: true,
+  petId: true,
+  petName: true,
+  petSpecies: true,
+  petWeightKg: true,
+  startsAt: true,
+  serviceEndsAt: true,
+  occupiedEndsAt: true,
+  timezone: true,
+  currency: true,
+  totalPriceSatang: true,
+  totalDurationMinutes: true,
+  bufferMinutes: true,
+  createdAt: true,
+  items: {
+    orderBy: { sortOrder: 'asc' },
+    select: {
+      serviceId: true,
+      code: true,
+      name: true,
+      kind: true,
+      priceSatang: true,
+      durationMinutes: true,
+      sortOrder: true,
+    },
+  },
+} satisfies Prisma.GroomingBookingSelect;
 
 @Injectable()
 export class BookingsService {
@@ -29,45 +62,116 @@ export class BookingsService {
       );
     }
 
+    // Normalize equivalent UUIDs, timestamps and service ordering.
+    const branchId = dto.branchId.toLowerCase();
+    const petId = dto.petId.toLowerCase();
+    const groomerId = dto.groomerId.toLowerCase();
+    const serviceIds = dto.serviceIds.map((id) => id.toLowerCase()).sort();
+
+    if (new Set(serviceIds).size !== serviceIds.length) {
+      throw new BadRequestException('Duplicate services are not allowed');
+    }
+
+    const requestKey = dto.requestKey.toLowerCase();
+
+    const requestHash = createHash('sha256')
+      .update(
+        JSON.stringify({
+          branchId,
+          petId,
+          groomerId,
+          startsAt: startsAt.toISOString(),
+          serviceIds,
+        }),
+      )
+      .digest('hex');
+
     const date = new Date(startsAt.getTime() + 7 * 60 * 60 * 1000)
       .toISOString()
       .slice(0, 10);
 
     return this.prismaService.$transaction(
       async (tx) => {
-        // Match the groomer lock used by schedule and time-off writes.
-        // Requests for the same groomer wait here before rechecking slots.
-        await tx.$queryRaw`
-            SELECT "id"
-            FROM "users"
-            WHERE "id" = ${dto.groomerId}::uuid
-            FOR UPDATE
+        if (requestKey) {
+          // Serialize the same owner's request key before other locks.
+          // This also protects requests that reuse a key with another groomer.
+          const lockName = JSON.stringify([
+            'grooming-booking-request',
+            ownerId.toLowerCase(),
+            requestKey,
+          ]);
+
+          await tx.$queryRaw<Array<{ locked: number }>>`
+            SELECT 1 AS "locked"
+            FROM pg_advisory_xact_lock(
+              hashtextextended(${lockName}::text, 0::bigint)
+            )
           `;
 
-        // Keep lock order consistent: groomer, branch, then pet.
+          const existing = await tx.groomingBookingRequest.findUnique({
+            where: {
+              ownerId_requestKey: {
+                ownerId,
+                requestKey,
+              },
+            },
+            select: {
+              requestHash: true,
+              booking: {
+                select: bookingSelect,
+              },
+            },
+          });
+
+          if (existing) {
+            if (existing.requestHash !== requestHash) {
+              throw new ConflictException({
+                code: 'BOOKING_REQUEST_REUSED',
+                message:
+                  'This request key has already been used with different booking details',
+              });
+            }
+
+            // Return the original booking with its current status.
+            // A cancelled booking must never be recreated by retrying.
+            return {
+              ...existing.booking,
+              petWeightKg: existing.booking.petWeightKg.toNumber(),
+            };
+          }
+        }
+
+        // Keep the existing lock order: groomer, branch, then pet.
         await tx.$queryRaw`
-            SELECT "id"
-            FROM "branches"
-            WHERE "id" = ${dto.branchId}::uuid
-            FOR UPDATE
-          `;
+          SELECT "id"
+          FROM "users"
+          WHERE "id" = ${groomerId}::uuid
+          FOR UPDATE
+        `;
 
         await tx.$queryRaw`
-            SELECT "id"
-            FROM "pets"
-            WHERE "id" = ${dto.petId}::uuid
-              AND "owner_id" = ${ownerId}::uuid
-            FOR UPDATE
-          `;
+          SELECT "id"
+          FROM "branches"
+          WHERE "id" = ${branchId}::uuid
+          FOR UPDATE
+        `;
+
+        await tx.$queryRaw`
+          SELECT "id"
+          FROM "pets"
+          WHERE "id" = ${petId}::uuid
+            AND "owner_id" = ${ownerId}::uuid
+          FOR UPDATE
+        `;
 
         const availability = await this.availabilityService.searchInTransaction(
           tx,
           ownerId,
           {
-            branchId: dto.branchId,
-            petId: dto.petId,
-            serviceIds: dto.serviceIds,
-            groomerId: dto.groomerId,
+            branchId,
+            petId,
+            serviceIds,
+            groomerId,
             date,
           },
         );
@@ -79,7 +183,7 @@ export class BookingsService {
         }
 
         const groomer = availability.groomers.find(
-          (candidate) => candidate.id === dto.groomerId,
+          (candidate) => candidate.id === groomerId,
         );
 
         const slot = groomer?.slots.find(
@@ -99,7 +203,7 @@ export class BookingsService {
             ownerId,
             petId: quote.pet.id,
             branchId: quote.branch.id,
-            groomerId: dto.groomerId,
+            groomerId,
             status: GroomingBookingStatus.CONFIRMED,
             startsAt: slot.startsAt,
             serviceEndsAt: slot.serviceEndsAt,
@@ -125,38 +229,19 @@ export class BookingsService {
               })),
             },
           },
-          select: {
-            id: true,
-            status: true,
-            branchId: true,
-            groomerId: true,
-            petId: true,
-            petName: true,
-            petSpecies: true,
-            petWeightKg: true,
-            startsAt: true,
-            serviceEndsAt: true,
-            occupiedEndsAt: true,
-            timezone: true,
-            currency: true,
-            totalPriceSatang: true,
-            totalDurationMinutes: true,
-            bufferMinutes: true,
-            createdAt: true,
-            items: {
-              orderBy: { sortOrder: 'asc' },
-              select: {
-                serviceId: true,
-                code: true,
-                name: true,
-                kind: true,
-                priceSatang: true,
-                durationMinutes: true,
-                sortOrder: true,
-              },
-            },
-          },
+          select: bookingSelect,
         });
+
+        if (requestKey) {
+          await tx.groomingBookingRequest.create({
+            data: {
+              ownerId,
+              requestKey,
+              requestHash,
+              bookingId: booking.id,
+            },
+          });
+        }
 
         return {
           ...booking,
@@ -164,7 +249,6 @@ export class BookingsService {
         };
       },
       {
-        // Read fresh committed data after waiting for the groomer lock.
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
         maxWait: 5000,
         timeout: 15_000,

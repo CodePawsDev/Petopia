@@ -13,6 +13,8 @@ import {
   type ServiceQuote,
 } from './quote-types';
 import ServiceCard from './service-card';
+import AvailabilityPicker from './availability-picker';
+import { useBookingFlow } from './booking-flow';
 
 const priceFormatter = new Intl.NumberFormat('th-TH', {
   style: 'currency',
@@ -34,6 +36,8 @@ export default function QuoteBuilder({
   hasWeightError: boolean;
   pet?: QuotePet;
 }) {
+  const { phase } = useBookingFlow();
+  const bookingLocked = phase !== 'idle';
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [quote, setQuote] = useState<ServiceQuote | null>(null);
   const [error, setError] = useState('');
@@ -59,7 +63,7 @@ export default function QuoteBuilder({
   );
 
   function toggleService(serviceId: string) {
-    if (requestController.current) return;
+    if (requestController.current || bookingLocked) return;
 
     setQuote(null);
     setError('');
@@ -73,6 +77,7 @@ export default function QuoteBuilder({
   async function calculateQuote() {
     if (
       !pet ||
+      bookingLocked ||
       requestController.current ||
       selectedIds.length === 0 ||
       sessionExpired
@@ -215,7 +220,11 @@ export default function QuoteBuilder({
                     pet
                       ? {
                           checked: selectedIds.includes(service.id),
-                          disabled: isPending || sessionExpired || incompatible,
+                          disabled:
+                            bookingLocked ||
+                            isPending ||
+                            sessionExpired ||
+                            incompatible,
                           reason,
                           onChange: () => toggleService(service.id),
                         }
@@ -247,6 +256,7 @@ export default function QuoteBuilder({
           <button
             type="button"
             disabled={
+              bookingLocked ||
               isPending ||
               sessionExpired ||
               weight === null ||
@@ -273,7 +283,7 @@ export default function QuoteBuilder({
             </Link>
           )}
 
-          {quote && (
+          {quote && phase !== 'success' && (
             <div role="status" className="mt-6 rounded-2xl bg-surface-soft p-5">
               <p className="font-semibold">
                 {quote.pet.name} · {quote.branch.name}
@@ -318,6 +328,9 @@ export default function QuoteBuilder({
                 การคำนวณราคานี้ยังไม่ใช่การจอง และยังไม่ได้สำรองเวลาให้บริการ
               </p>
             </div>
+          )}
+          {quote && !quote.requiresAssessment && (
+            <AvailabilityPicker key={JSON.stringify(quote)} quote={quote} />
           )}
         </div>
       )}
