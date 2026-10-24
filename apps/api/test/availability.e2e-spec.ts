@@ -15,6 +15,7 @@ import { setupApp } from '../src/setup-app';
 import { ConflictException } from '@nestjs/common';
 import { GroomerSchedulesService } from '../src/groomer-schedules/groomer-schedules.service';
 import { GroomerTimeOffsService } from '../src/groomer-schedules/groomer-time-offs.service';
+import { BranchClosuresService } from '../src/branch-closures/branch-closures.service';
 
 type Slot = {
   startsAt: string;
@@ -429,6 +430,249 @@ describe('Availability (e2e)', () => {
       if (app) await app.close();
     }
   }, 30_000);
+
+  it('[TC-CLOSURE-001] refreshes availability after creating and deleting a branch closure', async () => {
+    const closures = app.get(BranchClosuresService);
+
+    const before = await customer
+      .post('/availability/search')
+      .send(payload())
+      .expect(200);
+
+    expect(starts(before.body as unknown)).toContain(localTime('13:00'));
+
+    const closure = await closures.create(branchId, {
+      startsAt: localTime('13:00'),
+      endsAt: localTime('14:00'),
+      reason: 'Test branch closure',
+    });
+
+    const during = await customer
+      .post('/availability/search')
+      .send(payload())
+      .expect(200);
+
+    expect(starts(during.body as unknown)).not.toContain(localTime('13:00'));
+    expect(starts(during.body as unknown)).toContain(localTime('14:00'));
+
+    await closures.remove(branchId, closure.id);
+
+    const after = await customer
+      .post('/availability/search')
+      .send(payload())
+      .expect(200);
+
+    expect(starts(after.body as unknown)).toContain(localTime('13:00'));
+  });
+
+  it('[TC-CLOSURE-002] rejects a closure overlapping only the booking buffer without changing data or version', async () => {
+    const closures = app.get(BranchClosuresService);
+
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const before = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    // Fixture services take 55 minutes: 09:00–09:55.
+    // The occupied interval includes a buffer until 10:10.
+    await expect(
+      closures.create(branchId, {
+        startsAt: localTime('09:55'),
+        endsAt: localTime('10:10'),
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(
+      await prisma.branchClosure.count({
+        where: { branchId },
+      }),
+    ).toBe(0);
+
+    const after = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    expect(after.scheduleVersion).toBe(before.scheduleVersion);
+
+    expect(
+      await prisma.groomingBooking.count({
+        where: { branchId, groomerId, status: 'CONFIRMED' },
+      }),
+    ).toBe(1);
+  });
+
+  it('[TC-CLOSURE-003] permits a closure starting exactly at the occupied end and increments the branch version', async () => {
+    const closures = app.get(BranchClosuresService);
+
+    await customer.post('/bookings').send(bookingPayload()).expect(201);
+
+    const before = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    const closure = await closures.create(branchId, {
+      startsAt: localTime('10:10'),
+      endsAt: localTime('10:15'),
+    });
+
+    expect(closure.startsAt.toISOString()).toBe(localTime('10:10'));
+    expect(closure.endsAt.toISOString()).toBe(localTime('10:15'));
+
+    const afterCreate = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    expect(afterCreate.scheduleVersion).toBe(before.scheduleVersion + 1);
+
+    await closures.remove(branchId, closure.id);
+
+    const afterDelete = await prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { scheduleVersion: true },
+    });
+
+    expect(afterDelete.scheduleVersion).toBe(before.scheduleVersion + 2);
+  });
+
+  it('[TC-CLOSURE-004] permits only one of a conflicting booking and branch closure submitted together', async () => {
+    const closures = app.get(BranchClosuresService);
+
+    const results = await Promise.allSettled([
+      customer
+        .post('/bookings')
+        .send(bookingPayload())
+        .then((response) => response.status),
+      closures.create(branchId, {
+        startsAt: localTime('09:00'),
+        endsAt: localTime('10:10'),
+      }),
+    ]);
+
+    const bookingResult = results[0];
+    const closureResult = results[1];
+
+    if (bookingResult.status !== 'fulfilled') {
+      throw bookingResult.reason;
+    }
+
+    if (closureResult.status === 'fulfilled') {
+      expect(bookingResult.value).toBe(409);
+
+      expect(
+        await prisma.groomingBooking.count({
+          where: { branchId, groomerId },
+        }),
+      ).toBe(0);
+
+      expect(
+        await prisma.branchClosure.count({
+          where: { branchId },
+        }),
+      ).toBe(1);
+    } else {
+      expect(closureResult.reason as unknown).toBeInstanceOf(ConflictException);
+
+      expect(bookingResult.value).toBe(201);
+
+      expect(
+        await prisma.groomingBooking.count({
+          where: { branchId, groomerId },
+        }),
+      ).toBe(1);
+
+      expect(
+        await prisma.branchClosure.count({
+          where: { branchId },
+        }),
+      ).toBe(0);
+    }
+  });
+
+  it('[TC-AVL-017] refreshes both branches after creating and deleting groomer time off', async () => {
+    const timeOffs = app.get(GroomerTimeOffsService);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.groomerWorkingInterval.deleteMany({
+        where: {
+          branchId,
+          groomerId,
+          weekday,
+          startMinute: 780,
+        },
+      });
+
+      await tx.groomerWorkingInterval.create({
+        data: {
+          branchId: otherBranchId,
+          groomerId,
+          weekday,
+          startMinute: 780,
+          endMinute: 1080,
+        },
+      });
+    });
+
+    const firstBranchPayload = payload();
+    const secondBranchPayload = {
+      ...payload(),
+      branchId: otherBranchId,
+    };
+
+    const beforeFirst = await customer
+      .post('/availability/search')
+      .send(firstBranchPayload)
+      .expect(200);
+
+    const beforeSecond = await customer
+      .post('/availability/search')
+      .send(secondBranchPayload)
+      .expect(200);
+
+    expect(starts(beforeFirst.body as unknown)).toContain(localTime('09:00'));
+    expect(starts(beforeSecond.body as unknown)).toContain(localTime('13:00'));
+
+    const timeOff = await timeOffs.create(branchId, groomerId, {
+      startsAt: localTime('09:00'),
+      endsAt: localTime('14:00'),
+      reason: 'Cross-branch refresh test',
+    });
+
+    const duringFirst = await customer
+      .post('/availability/search')
+      .send(firstBranchPayload)
+      .expect(200);
+
+    const duringSecond = await customer
+      .post('/availability/search')
+      .send(secondBranchPayload)
+      .expect(200);
+
+    expect(starts(duringFirst.body as unknown)).toEqual([]);
+    expect(starts(duringSecond.body as unknown)).not.toContain(
+      localTime('13:00'),
+    );
+    expect(starts(duringSecond.body as unknown)).toContain(localTime('14:00'));
+
+    await timeOffs.remove(branchId, groomerId, timeOff.id);
+
+    const afterFirst = await customer
+      .post('/availability/search')
+      .send(firstBranchPayload)
+      .expect(200);
+
+    const afterSecond = await customer
+      .post('/availability/search')
+      .send(secondBranchPayload)
+      .expect(200);
+
+    expect(starts(afterFirst.body as unknown)).toContain(localTime('09:00'));
+    expect(starts(afterSecond.body as unknown)).toContain(localTime('13:00'));
+  });
 
   it('[TC-AVL-001] calculates price, duration, buffer and Bangkok slots', async () => {
     const response = await customer
