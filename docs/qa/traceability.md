@@ -573,6 +573,53 @@ Full-project verification completed locally on Windows:
 The full E2E total covers the entire API, not only this review.
 The existing pg concurrent-query deprecation warning remains unresolved.
 
+## Branch bookings UI
+
+Scope: read-only daily appointment lists for managers and groomers.
+
+Implementation:
+
+- Managers view branch appointments.
+- Groomers view their own appointments in the selected branch.
+- Users select a date, inspect services and reload the list.
+- Times display in Asia/Bangkok and prices display in THB.
+- Lists support pagination with 10 appointments per page.
+
+### Manual browser checks — 2026-10-24
+
+Executed by the developer locally:
+
+- [x] Manager list displays appointments in ascending start-time order.
+- [x] Pet, owner, groomer, services, prices and Thai times match the API.
+- [x] Service details expand successfully.
+- [x] A date without appointments displays the empty state.
+- [x] Groomer list loads the signed-in groomer's appointments.
+- [x] A groomer cannot access the manager list.
+- [x] Customers cannot access either staff list.
+- [x] Unauthenticated visitors see a login prompt without booking data.
+- [x] Offline requests show an error and can be retried after reconnecting.
+- [x] Pagination is checked with more than 10 appointments on one date.
+- [x] Layout is checked at a mobile viewport width.
+
+The current manual fixture uses one groomer, so it does not independently
+prove filtering between multiple groomers. API coverage for that isolation
+is recorded under TC-BRBOOK-002.
+
+### Verification — 2026-10-24
+
+Developer executed locally on Windows:
+
+- API and web lint passed.
+- API unit tests: 12 passed across 2 suites.
+- Full API E2E suite: 225 passed across 10 suites.
+- API and web production builds passed.
+- `git diff --check` passed.
+- All manual browser checks above passed, including pagination and
+  mobile layout.
+
+The automated test totals cover the API. UI behavior was checked manually.
+The existing pg concurrent-query deprecation warning remains unresolved.
+
 ## Maintenance
 
 - Add the case ID to the corresponding automated test title.
