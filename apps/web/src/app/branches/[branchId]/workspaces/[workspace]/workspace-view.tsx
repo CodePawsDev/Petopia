@@ -173,8 +173,22 @@ export default function WorkspaceView({
               </p>
             </div>
 
-            <div className="mt-6 border-t border-border pt-6">
-              {workspace === 'manager' ? (
+            <div className="mt-6 space-y-4 border-t border-border pt-6">
+              {(workspace === 'manager' || workspace === 'groomer') && (
+                <Link
+                  href={`/branches/${encodeURIComponent(branchId)}/workspaces/${workspace}/bookings`}
+                  className="flex min-h-14 items-center justify-between gap-4 rounded-2xl border border-border bg-surface-soft px-5 py-4 font-semibold text-primary hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  <span>
+                    {workspace === 'manager'
+                      ? 'นัดหมายของสาขา'
+                      : 'นัดหมายของฉัน'}
+                  </span>
+                  <span aria-hidden="true">→</span>
+                </Link>
+              )}
+
+              {workspace === 'manager' && (
                 <Link
                   href={`/branches/${encodeURIComponent(branchId)}/groomer-schedules`}
                   className="flex min-h-14 items-center justify-between gap-4 rounded-2xl border border-border bg-surface-soft px-5 py-4 font-semibold text-primary hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -182,7 +196,9 @@ export default function WorkspaceView({
                   <span>ตารางช่างและวันหยุด</span>
                   <span aria-hidden="true">→</span>
                 </Link>
-              ) : (
+              )}
+
+              {workspace === 'payment' && (
                 <>
                   <h2 className="font-semibold">
                     ยังไม่มีรายการในพื้นที่ทำงานนี้
