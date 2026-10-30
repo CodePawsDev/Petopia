@@ -1,0 +1,54 @@
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Build, Lint and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/petopia_ci
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npm exec --workspace=apps/api -- prisma validate
+
+      - name: Build API
+        run: npm run build --workspace=apps/api
+
+      - name: Lint API
+        run: npm run lint --workspace=apps/api
+
+      - name: Test API
+        run: npm run test --workspace=apps/api -- --runInBand
+
+      - name: E2E test API
+        run: npm run test:e2e --workspace=apps/api -- --runInBand
+
+      - name: Build Web
+        run: npm run build --workspace=apps/web
+
+      - name: Lint Web
+        run: npm run lint --workspace=apps/web
